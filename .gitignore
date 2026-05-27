@@ -1,0 +1,20 @@
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Local environment
+.env
+.env*.local
+
+# Personal portfolio data
+data/*.csv
+!data/*.example.csv

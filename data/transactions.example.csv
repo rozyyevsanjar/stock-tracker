@@ -1,0 +1,4 @@
+date,type,ticker,company,quantity,price,fees,total,currency,account,notes,lot_id,linked_lot_id
+01/01/2026,BUY,AAPL,Apple Inc,1,180,0,180,$,Main,Example buy,AAPL-20260101-01,
+15/01/2026,SELL,AAPL,Apple Inc,1,190,0,190,$,Main,Example sell,,AAPL-20260101-01
+01/01/2026,BUY,ETH-USD,Ethereum,0.1,3000,0,300,$,Main,Example crypto buy,ETH-USD-20260101-01,
