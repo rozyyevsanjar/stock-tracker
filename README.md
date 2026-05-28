@@ -1,6 +1,6 @@
-# Personal Stock Tracker
+# Personal Investment Assistant
 
-A Next.js dashboard for tracking a small personal portfolio. It reads local CSV data, fetches live market prices, and shows portfolio value, allocation, performance, transactions, and lot-level profit/loss.
+A Next.js dashboard for tracking a small personal portfolio. It reads local CSV data, fetches live market prices, and shows portfolio value, allocation, performance, transactions, learning resources, and lot-level profit/loss.
 
 ## Features
 
@@ -10,6 +10,7 @@ A Next.js dashboard for tracking a small personal portfolio. It reads local CSV 
 - Performance chart with selectable time ranges.
 - Transaction ledger support for buys, sells, dividends, deposits, withdrawals, fees, and linked lots.
 - Lot closing workflow through the local API.
+- Learn tab with basic YouTube learning paths for stocks, crypto, risk, and market behavior.
 - Light/dark theme toggle and research tools.
 
 ## Getting Started

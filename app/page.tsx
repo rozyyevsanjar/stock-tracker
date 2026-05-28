@@ -28,7 +28,7 @@ import type { ReactNode } from "react";
 
 export const revalidate = 900;
 
-type Tab = "home" | "transactions" | "research";
+type Tab = "home" | "transactions" | "research" | "learn";
 type LotStatusFilter = "all" | "open" | "closed";
 type LotResultFilter = "all" | "profitable" | "loss" | "flat";
 type LotSort = "newest" | "oldest" | "profit" | "loss" | "value";
@@ -219,6 +219,7 @@ function TabBar({ activeTab }: { activeTab: Tab }) {
     { label: "Home", value: "home", href: "/" },
     { label: "Transaction history", value: "transactions", href: "/?tab=transactions" },
     { label: "Research", value: "research", href: "/?tab=research" },
+    { label: "Learn", value: "learn", href: "/?tab=learn" },
   ];
 
   return (
@@ -234,6 +235,138 @@ function TabBar({ activeTab }: { activeTab: Tab }) {
         </a>
       ))}
     </nav>
+  );
+}
+
+const LEARN_COURSES = [
+  {
+    title: "Stock Market Basics",
+    description: "Start with what shares represent, how exchanges work, and why prices move.",
+    level: "Beginner",
+    topics: ["Stocks", "Indexes", "Orders"],
+    url: "https://www.youtube.com/results?search_query=stock+market+basics+for+beginners",
+  },
+  {
+    title: "Reading Financial Statements",
+    description: "Learn the income statement, balance sheet, cash flow, and the ratios investors use.",
+    level: "Beginner",
+    topics: ["Revenue", "Margins", "Cash flow"],
+    url: "https://www.youtube.com/results?search_query=financial+statements+for+investors+beginner",
+  },
+  {
+    title: "Portfolio Risk",
+    description: "Understand diversification, position sizing, volatility, and drawdowns before chasing returns.",
+    level: "Core",
+    topics: ["Risk", "Diversification", "Allocation"],
+    url: "https://www.youtube.com/results?search_query=portfolio+risk+management+for+beginners+investing",
+  },
+  {
+    title: "Crypto Fundamentals",
+    description: "A plain-English path through Bitcoin, Ethereum, wallets, exchanges, and blockchain basics.",
+    level: "Beginner",
+    topics: ["Bitcoin", "Ethereum", "Wallets"],
+    url: "https://www.youtube.com/results?search_query=cryptocurrency+for+beginners+blockchain+wallets",
+  },
+  {
+    title: "Crypto Security",
+    description: "Focus on seed phrases, self-custody, exchange risk, scams, and safer habits.",
+    level: "Core",
+    topics: ["Security", "Custody", "Scams"],
+    url: "https://www.youtube.com/results?search_query=crypto+wallet+security+seed+phrase+self+custody+beginner",
+  },
+  {
+    title: "Market Psychology",
+    description: "Recognize FOMO, panic selling, overconfidence, and the behavior loops behind bad trades.",
+    level: "Mindset",
+    topics: ["Behavior", "FOMO", "Discipline"],
+    url: "https://www.youtube.com/results?search_query=investing+psychology+fomo+panic+selling+beginner",
+  },
+] as const;
+
+const LEARN_PLAYLISTS = [
+  {
+    title: "Build Your Foundation",
+    description: "A quick search path for beginner-friendly stock market explainers.",
+    href: "https://www.youtube.com/results?search_query=investing+for+beginners+stocks+explained",
+  },
+  {
+    title: "Understand Crypto Before Buying",
+    description: "Videos focused on blockchain basics, wallets, and security instead of hype.",
+    href: "https://www.youtube.com/results?search_query=crypto+basics+for+beginners+no+hype",
+  },
+  {
+    title: "Learn Risk First",
+    description: "Lessons on losing less, sizing positions, and surviving volatile markets.",
+    href: "https://www.youtube.com/results?search_query=investing+risk+management+position+sizing+beginners",
+  },
+] as const;
+
+function LearnView() {
+  return (
+    <>
+      <section className="learnHero">
+        <div>
+          <span className="eyebrow">Learning hub</span>
+          <h2>Stocks and crypto, without the noise.</h2>
+          <p>
+            A simple starting shelf for videos and study paths. Later this can connect to
+            your holdings and watchlist so the lessons match what you actually own or track.
+          </p>
+        </div>
+        <div className="learnHeroStats" aria-label="Learning categories">
+          <strong>{LEARN_COURSES.length}</strong>
+          <span>starter topics</span>
+        </div>
+      </section>
+
+      <section>
+        <div className="sectionHeader">
+          <div>
+            <h2>YouTube learning picks</h2>
+            <p className="sectionNote">
+              These open YouTube searches for relevant educational videos. No API key needed yet.
+            </p>
+          </div>
+          <span className="statusPill">Basic version</span>
+        </div>
+
+        <div className="learnGrid">
+          {LEARN_COURSES.map((course) => (
+            <a className="learnCard" href={course.url} key={course.title} rel="noreferrer" target="_blank">
+              <span className="typePill split">{course.level}</span>
+              <h3>{course.title}</h3>
+              <p>{course.description}</p>
+              <span className="learnTopics">
+                {course.topics.map((topic) => (
+                  <small key={topic}>{topic}</small>
+                ))}
+              </span>
+              <strong>Find videos on YouTube</strong>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="sectionHeader">
+          <div>
+            <h2>Suggested paths</h2>
+            <p className="sectionNote">A tiny curriculum for the next version of this tab.</p>
+          </div>
+        </div>
+        <div className="learnPathList">
+          {LEARN_PLAYLISTS.map((item, index) => (
+            <a className="learnPathItem" href={item.href} key={item.title} rel="noreferrer" target="_blank">
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <strong>{item.title}</strong>
+                <p>{item.description}</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -537,6 +670,7 @@ function normalizeTimeframe(value: string | string[] | undefined): Timeframe {
 function normalizeTab(value: string | string[] | undefined): Tab {
   const raw = Array.isArray(value) ? value[0] : value;
   if (raw === "research") return "research";
+  if (raw === "learn") return "learn";
   return raw === "transactions" ? "transactions" : "home";
 }
 
@@ -607,19 +741,57 @@ export default async function Home({
   const activeTab = normalizeTab(params.tab);
   const timeframe = normalizeTimeframe(params.range);
 
+  if (activeTab === "learn") {
+    return (
+      <main>
+        <TopBar activeTab={activeTab} />
+        <header className="pageHeader">
+          <div>
+          <h1>Learn</h1>
+            <p>Simple learning resources for stocks, crypto, risk, and market behavior.</p>
+          </div>
+          <span className="statusPill">YouTube resources</span>
+        </header>
+        <LearnView />
+      </main>
+    );
+  }
+
   if (activeTab === "research") {
     const symbol = normalizeResearchSymbol(params.symbol);
+    const lots = await loadLots();
+    const portfolioTickers = Array.from(new Set(lots.map((lot) => lot.ticker)));
+    const quoteTickers = Array.from(new Set(symbol ? [...portfolioTickers, symbol] : portfolioTickers));
     const [quotes, history, research]: [
       Record<string, Quote>,
       PricePoint[],
       { profile: ResearchProfile | null; news: ResearchNewsItem[] },
     ] = symbol
       ? await Promise.all([
-          fetchQuotes([symbol]),
+          fetchQuotes(quoteTickers),
           fetchPriceHistory([symbol], timeframe),
           fetchResearchOverview(symbol),
         ])
-      : [{}, [] as PricePoint[], { profile: null, news: [] }];
+      : [await fetchQuotes(quoteTickers), [] as PricePoint[], { profile: null, news: [] }];
+    const holdings = aggregateLots(lots, quotes);
+    const exposureHolding = symbol
+      ? holdings.find((holding) => holding.ticker === symbol) ?? null
+      : null;
+    const totalPortfolioValue = holdings.reduce((total, holding) => total + holding.currentValue, 0);
+    const exposure = exposureHolding
+      ? {
+          allocationPercent: exposureHolding.allocationPercent,
+          company: exposureHolding.company,
+          currentValue: exposureHolding.currentValue,
+          dailyChange: exposureHolding.valueDailyChange,
+          invested: exposureHolding.invested,
+          profit: exposureHolding.profit,
+          profitPercent: exposureHolding.profitPercent,
+          shares: exposureHolding.shares,
+          symbol: exposureHolding.ticker,
+          totalPortfolioValue,
+        }
+      : null;
 
     return (
       <main>
@@ -632,6 +804,7 @@ export default async function Home({
           <span className="statusPill">Yahoo + CoinGecko</span>
         </header>
         <ResearchView
+          exposure={exposure}
           history={history}
           news={research.news}
           profile={research.profile}
@@ -694,8 +867,8 @@ export default async function Home({
       <TopBar activeTab={activeTab} />
       <header className="pageHeader">
         <div>
-          <h1>Personal Stock Tracker</h1>
-          <p>A focused dashboard for your current portfolio.</p>
+          <h1>Personal Investment Assistant</h1>
+          <p>A focused dashboard for your portfolio, research, and learning.</p>
           <MarketStatus />
         </div>
         <span className="statusPill">Live market data</span>

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Personal Stock Tracker",
-  description: "A focused portfolio dashboard for personal investing.",
+  title: "Personal Investment Assistant",
+  description: "A focused portfolio dashboard and learning assistant for personal investing.",
 };
 
 export default function RootLayout({

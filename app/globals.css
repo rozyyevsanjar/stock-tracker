@@ -599,6 +599,176 @@ section {
   color: var(--blue);
 }
 
+.learnHero {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 132px;
+}
+
+.learnHero h2 {
+  font-size: clamp(1.65rem, 3vw, 2.45rem);
+  line-height: 1.1;
+  margin: 8px 0 0;
+}
+
+.learnHero p {
+  color: var(--muted);
+  line-height: 1.58;
+  margin-top: 12px;
+  max-width: 680px;
+}
+
+.eyebrow {
+  color: var(--blue);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.learnHeroStats {
+  align-items: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 8px;
+  justify-self: end;
+  min-width: 0;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+
+.learnHeroStats strong {
+  color: var(--blue);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.learnHeroStats span {
+  color: var(--muted);
+  font-weight: 750;
+  margin-top: 0;
+}
+
+.learnGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-top: 22px;
+}
+
+.learnCard {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: grid;
+  gap: 10px;
+  grid-template-rows: auto auto 1fr auto auto;
+  min-height: 220px;
+  padding: 16px;
+  text-decoration: none;
+  transition:
+    border-color var(--motion),
+    box-shadow var(--motion),
+    transform var(--motion);
+}
+
+.learnCard:hover {
+  border-color: color-mix(in srgb, var(--line), var(--blue) 58%);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.learnCard h3 {
+  font-size: 1.08rem;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.learnCard p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.learnCard > strong {
+  align-self: end;
+  color: var(--blue);
+  font-size: 0.9rem;
+}
+
+.learnCard .typePill {
+  justify-self: start;
+}
+
+.learnTopics {
+  align-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.learnTopics small {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+  padding: 6px 8px;
+}
+
+.learnPathList {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.learnPathItem {
+  align-items: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  padding: 14px;
+  text-decoration: none;
+  transition:
+    border-color var(--motion),
+    transform var(--motion);
+}
+
+.learnPathItem:hover {
+  border-color: color-mix(in srgb, var(--line), var(--blue) 58%);
+  transform: translateY(-1px);
+}
+
+.learnPathItem > span {
+  align-items: center;
+  background: color-mix(in srgb, var(--blue), transparent 86%);
+  border: 1px solid color-mix(in srgb, var(--blue), transparent 55%);
+  border-radius: 8px;
+  color: var(--blue);
+  display: inline-flex;
+  font-weight: 900;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.learnPathItem strong {
+  display: block;
+}
+
+.learnPathItem p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
 .researchSearch {
   display: grid;
   gap: 10px;
@@ -986,6 +1156,53 @@ section {
 
 .newsItem:not(:has(img)) {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.exposureCard {
+  border-color: color-mix(in srgb, var(--line), var(--blue) 26%);
+}
+
+.exposureSummary {
+  color: var(--muted);
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  line-height: 1.45;
+  margin-top: 18px;
+}
+
+.exposureSummary strong {
+  color: var(--text);
+}
+
+.exposureGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.exposureGrid div {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+}
+
+.exposureGrid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.exposureGrid strong {
+  font-size: 1rem;
+}
+
+.exposureNote {
+  color: var(--muted);
+  line-height: 1.55;
+  margin-top: 16px;
 }
 
 .lotFilterPanel {
@@ -1573,7 +1790,10 @@ svg:hover .investedLine {
   .tickerGrid,
   .dashboardGrid,
   .researchInfoGrid,
-  .fundamentalsGrid {
+  .fundamentalsGrid,
+  .exposureGrid,
+  .learnGrid,
+  .learnHero {
     grid-template-columns: 1fr;
   }
 
@@ -1632,16 +1852,22 @@ svg:hover .investedLine {
   }
 
   .appTabs {
+    flex-wrap: wrap;
     width: 100%;
   }
 
   .appTabs a {
     flex: 1;
+    min-width: fit-content;
     text-align: center;
   }
 
   .themeToggle {
     justify-content: center;
     width: 100%;
+  }
+
+  .learnHeroStats {
+    justify-self: start;
   }
 }

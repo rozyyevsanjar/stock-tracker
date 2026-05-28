@@ -19,6 +19,19 @@ type WatchlistItem = {
   symbol: string;
 };
 
+type PortfolioExposure = {
+  allocationPercent: number;
+  company: string;
+  currentValue: number;
+  dailyChange: number;
+  invested: number;
+  profit: number;
+  profitPercent: number;
+  shares: number;
+  symbol: string;
+  totalPortfolioValue: number;
+};
+
 const TIMEFRAMES: Array<{ label: string; value: Timeframe }> = [
   { label: "1D", value: "1d" },
   { label: "1W", value: "1w" },
@@ -659,7 +672,65 @@ function ResearchNewsPanel({ news }: { news: ResearchNewsItem[] }) {
   );
 }
 
+function PortfolioExposurePanel({
+  exposure,
+  symbol,
+}: {
+  exposure: PortfolioExposure | null;
+  symbol: string;
+}) {
+  return (
+    <section className="exposureCard">
+      <div className="sectionHeader">
+        <div>
+          <h2>Portfolio exposure</h2>
+          <p className="sectionNote">How this searched asset connects to your current portfolio.</p>
+        </div>
+        <span className="statusPill">Decision intelligence</span>
+      </div>
+
+      {exposure ? (
+        <>
+          <p className="exposureSummary">
+            You currently hold <strong>{formatPercent(exposure.allocationPercent, 1)}</strong>{" "}
+            {exposure.symbol} exposure.
+          </p>
+          <div className="exposureGrid">
+            <div>
+              <span>Position value</span>
+              <strong>{formatMoney(exposure.currentValue)}</strong>
+            </div>
+            <div>
+              <span>Shares / units</span>
+              <strong>{exposure.shares.toLocaleString("en-US", { maximumFractionDigits: 8 })}</strong>
+            </div>
+            <div>
+              <span>Invested</span>
+              <strong>{formatMoney(exposure.invested)}</strong>
+            </div>
+            <div>
+              <span>P/L</span>
+              <strong className={tone(exposure.profit)}>
+                {formatMoney(exposure.profit)} ({formatPercent(exposure.profitPercent)})
+              </strong>
+            </div>
+          </div>
+          <p className="exposureNote">
+            Adding to this asset would increase your {exposure.symbol} concentration above{" "}
+            {formatPercent(exposure.allocationPercent, 1)} of the portfolio.
+          </p>
+        </>
+      ) : (
+        <p className="exposureSummary">
+          You do not currently hold <strong>{symbol}</strong> in this portfolio.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function ResearchView({
+  exposure,
   history,
   news,
   profile,
@@ -667,6 +738,7 @@ export function ResearchView({
   symbol,
   timeframe,
 }: {
+  exposure: PortfolioExposure | null;
   history: PricePoint[];
   news: ResearchNewsItem[];
   profile: ResearchProfile | null;
@@ -710,6 +782,8 @@ export function ResearchView({
               help="Stocks use Yahoo Finance. Supported crypto uses CoinGecko."
             />
           </section>
+
+          <PortfolioExposurePanel exposure={exposure} symbol={symbol} />
 
           <section>
             <div className="sectionHeader">
