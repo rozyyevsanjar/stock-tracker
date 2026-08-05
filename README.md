@@ -9,6 +9,8 @@ A Next.js dashboard for tracking a small personal portfolio. It reads local CSV 
 - Holdings and allocation views.
 - Performance chart with selectable time ranges.
 - Transaction ledger support for buys, sells, dividends, deposits, withdrawals, fees, and linked lots.
+- Open new lots from the transaction history screen.
+- Inline transaction editing from the lot detail view.
 - Lot closing workflow through the local API.
 - Learn tab with basic YouTube learning paths for stocks, crypto, risk, and market behavior.
 - Light/dark theme toggle and research tools.
@@ -43,16 +45,16 @@ http://localhost:3000/?tab=transactions
 
 The app expects local CSV files in the `data` directory.
 
-Required for holdings:
-
-```text
-data/portfolio.csv
-```
-
-Required for the transactions tab:
+Required for current holdings, lots, and closed-position updates:
 
 ```text
 data/transactions.csv
+```
+
+Legacy/simple holdings examples are still available:
+
+```text
+data/portfolio.example.csv
 ```
 
 Example files are included:
@@ -65,7 +67,6 @@ data/transactions.example.csv
 If you do not have the real CSV files yet, copy the example files and edit them:
 
 ```bash
-cp data/portfolio.example.csv data/portfolio.csv
 cp data/transactions.example.csv data/transactions.csv
 ```
 

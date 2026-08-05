@@ -1,4 +1,4 @@
-import { aggregateLots, loadLots, parsePurchaseDate } from "@/lib/portfolio";
+import { CASH_BALANCE, aggregateLots, loadLots, parsePurchaseDate } from "@/lib/portfolio";
 import {
   TIMEFRAMES,
   type Timeframe,
@@ -8,7 +8,7 @@ import {
   fetchResearchOverview,
 } from "@/lib/market";
 import { formatMoney, formatPercent, formatShares, signed } from "@/lib/format";
-import { buildTransactionLots, loadTransactions } from "@/lib/transactions";
+import { buildTransactionLots, cashImpact, loadTransactions } from "@/lib/transactions";
 import { assetLogoFallback, assetLogoUrl } from "@/lib/logos";
 import type {
   Holding,
@@ -24,6 +24,8 @@ import { PerformanceChart } from "./performance-chart";
 import { ResearchView } from "./research-tools";
 import { ThemeToggle } from "./theme-toggle";
 import { CloseLotForm } from "./close-lot-form";
+import { TransactionEditForm } from "./transaction-edit-form";
+import { OpenLotForm } from "./open-lot-form";
 import type { ReactNode } from "react";
 
 export const revalidate = 900;
@@ -466,6 +468,11 @@ function InvestmentLots({
   const totalProfit = lots.reduce((total, lot) => total + lot.profit, 0);
   const openValue = openLots.reduce((total, lot) => total + lot.currentValue, 0);
   const tickerOptions = Array.from(new Set(allLots.map((lot) => lot.ticker))).sort();
+  const buyTransactions = new Map(
+    allLots.flatMap((lot) =>
+      lot.buyTransaction ? [[lot.id, lot.buyTransaction] as const] : [],
+    ),
+  );
 
   return (
     <>
@@ -628,15 +635,21 @@ function InvestmentLots({
                         <h3>Buy</h3>
                         <p>{lot.buyDate || "Unknown"} at {formatMoney(lot.buyPrice)}</p>
                         <p>{formatShares(lot.buyQuantity)} shares for {formatMoney(lot.buyTotal)}</p>
+                        {buyTransactions.get(lot.id) ? (
+                          <TransactionEditForm transaction={buyTransactions.get(lot.id)!} />
+                        ) : null}
                       </div>
                       <div>
                         <h3>{closed ? "Sell" : "Current"}</h3>
                         {closed ? (
                           lot.sellTransactions.map((transaction) => (
-                            <p key={`${transaction.date}-${transaction.total}`}>
-                              {transaction.date || "Unknown"} at {formatMoney(transaction.price)}:
-                              {" "}{formatShares(transaction.quantity)} for {formatMoney(transaction.total)}
-                            </p>
+                            <div className="sellTransaction" key={`${transaction.rowIndex}-${transaction.date}-${transaction.total}`}>
+                              <p>
+                                {transaction.date || "Unknown"} at {formatMoney(transaction.price)}:
+                                {" "}{formatShares(transaction.quantity)} for {formatMoney(transaction.total)}
+                              </p>
+                              <TransactionEditForm transaction={transaction} />
+                            </div>
                           ))
                         ) : (
                           <>
@@ -732,6 +745,56 @@ function filterTransactionLots(lots: TransactionLot[], filters: LotFilters) {
     });
 }
 
+function snapshotLotIds(lots: Lot[]) {
+  const counts = new Map<string, number>();
+
+  return new Set(
+    lots.map((lot) => {
+      const date = parsePurchaseDate(lot.purchaseDate);
+      const dateKey = date
+        ? `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`
+        : lot.purchaseDate.replace(/\D/g, "");
+      const key = `${lot.ticker}-${dateKey}`;
+      const count = (counts.get(key) ?? 0) + 1;
+      counts.set(key, count);
+      return `${key}-${String(count).padStart(2, "0")}`;
+    }),
+  );
+}
+
+function snapshotBaselineRowIndex(transactions: Awaited<ReturnType<typeof loadTransactions>>, snapshotIds: Set<string>) {
+  const indexes = transactions
+    .filter((transaction) => transaction.type === "BUY" && snapshotIds.has(transaction.lotId))
+    .map((transaction) => transaction.rowIndex);
+
+  return indexes.length ? Math.max(...indexes) : -1;
+}
+
+async function loadPortfolioStateFromTransactions(): Promise<{ cashBalance: number; lots: Lot[] }> {
+  const [transactions, snapshotLots] = await Promise.all([loadTransactions(), loadLots()]);
+  const transactionLots = buildTransactionLots(transactions);
+  const snapshotIds = snapshotLotIds(snapshotLots);
+  const baselineRowIndex = snapshotBaselineRowIndex(transactions, snapshotIds);
+  const cashBalance =
+    CASH_BALANCE +
+    transactions
+      .filter((transaction) => transaction.rowIndex > baselineRowIndex)
+      .reduce((total, transaction) => total + cashImpact(transaction), 0);
+  const lots = transactionLots
+    .filter((lot) => lot.status === "open" && lot.remainingQuantity > 0)
+    .map((lot) => ({
+      ticker: lot.ticker,
+      company: lot.company,
+      purchaseDate: lot.buyDate,
+      shares: lot.remainingQuantity,
+      buyPrice: lot.remainingQuantity ? lot.remainingCost / lot.remainingQuantity : lot.buyPrice,
+      fees: 0,
+      notes: lot.id,
+    }));
+
+  return { cashBalance, lots };
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -747,7 +810,7 @@ export default async function Home({
         <TopBar activeTab={activeTab} />
         <header className="pageHeader">
           <div>
-          <h1>Learn</h1>
+            <h1>Learn</h1>
             <p>Simple learning resources for stocks, crypto, risk, and market behavior.</p>
           </div>
           <span className="statusPill">YouTube resources</span>
@@ -759,7 +822,7 @@ export default async function Home({
 
   if (activeTab === "research") {
     const symbol = normalizeResearchSymbol(params.symbol);
-    const lots = await loadLots();
+    const { cashBalance, lots } = await loadPortfolioStateFromTransactions();
     const portfolioTickers = Array.from(new Set(lots.map((lot) => lot.ticker)));
     const quoteTickers = Array.from(new Set(symbol ? [...portfolioTickers, symbol] : portfolioTickers));
     const [quotes, history, research]: [
@@ -773,7 +836,7 @@ export default async function Home({
           fetchResearchOverview(symbol),
         ])
       : [await fetchQuotes(quoteTickers), [] as PricePoint[], { profile: null, news: [] }];
-    const holdings = aggregateLots(lots, quotes);
+    const holdings = aggregateLots(lots, quotes, cashBalance);
     const exposureHolding = symbol
       ? holdings.find((holding) => holding.ticker === symbol) ?? null
       : null;
@@ -836,12 +899,13 @@ export default async function Home({
           </div>
           <span className="statusPill">CSV-backed</span>
         </header>
+        <OpenLotForm />
         <InvestmentLots allLots={transactionLots} filters={lotFilters} lots={filteredLots} />
       </main>
     );
   }
 
-  const lots = await loadLots();
+  const { cashBalance, lots } = await loadPortfolioStateFromTransactions();
   const tickers = Array.from(new Set(lots.map((lot) => lot.ticker)));
   const firstPurchaseDate = lots
     .map((lot) => parsePurchaseDate(lot.purchaseDate))
@@ -851,7 +915,7 @@ export default async function Home({
     fetchQuotes(tickers),
     fetchPriceHistory(tickers, timeframe, firstPurchaseDate),
   ]);
-  const holdings = aggregateLots(lots, quotes);
+  const holdings = aggregateLots(lots, quotes, cashBalance);
   const performance = buildPerformance(history, lots);
 
   const totalInvested = holdings.reduce((total, holding) => total + holding.invested, 0);

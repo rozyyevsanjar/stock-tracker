@@ -32,7 +32,8 @@ function splitCsvLine(line: string) {
 
 export async function loadLots(): Promise<Lot[]> {
   const filePath = path.join(process.cwd(), "data", "portfolio.csv");
-  const content = await readFile(filePath, "utf8");
+  const examplePath = path.join(process.cwd(), "data", "portfolio.example.csv");
+  const content = await readFile(filePath, "utf8").catch(() => readFile(examplePath, "utf8"));
   const [headerLine, ...rows] = content.trim().split(/\r?\n/);
   const headers = splitCsvLine(headerLine);
 
@@ -63,7 +64,11 @@ export function parsePurchaseDate(date: string) {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-export function aggregateLots(lots: Lot[], quotes: Record<string, Quote>): Holding[] {
+export function aggregateLots(
+  lots: Lot[],
+  quotes: Record<string, Quote>,
+  cashBalance = CASH_BALANCE,
+): Holding[] {
   const byTicker = new Map<string, Lot[]>();
   for (const lot of lots) {
     byTicker.set(lot.ticker, [...(byTicker.get(lot.ticker) ?? []), lot]);
@@ -114,16 +119,16 @@ export function aggregateLots(lots: Lot[], quotes: Record<string, Quote>): Holdi
     ticker: "CASH",
     company: "Uninvested cash",
     shares: 1,
-    buyPrice: CASH_BALANCE,
+    buyPrice: cashBalance,
     invested: 0,
     fees: 0,
     lots: 1,
-    currentPrice: CASH_BALANCE,
-    previousPrice: CASH_BALANCE,
+    currentPrice: cashBalance,
+    previousPrice: cashBalance,
     dailyChange: 0,
     dailyChangePercent: 0,
-    currentValue: CASH_BALANCE,
-    previousValue: CASH_BALANCE,
+    currentValue: cashBalance,
+    previousValue: cashBalance,
     valueDailyChange: 0,
     profit: 0,
     profitPercent: 0,

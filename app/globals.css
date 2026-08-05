@@ -1393,7 +1393,8 @@ section {
   margin-top: 6px;
 }
 
-.closeLotForm {
+.closeLotForm,
+.openLotForm {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 12px;
@@ -1406,7 +1407,8 @@ section {
   margin: 0;
 }
 
-.closeLotForm label {
+.closeLotForm label,
+.openLotForm label {
   color: var(--muted);
   display: grid;
   font-size: 0.78rem;
@@ -1415,7 +1417,9 @@ section {
 }
 
 .closeLotForm input,
-.closeLotForm textarea {
+.closeLotForm textarea,
+.openLotForm input,
+.openLotForm textarea {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1425,16 +1429,27 @@ section {
 }
 
 .closeLotForm input:focus,
-.closeLotForm textarea:focus {
+.closeLotForm textarea:focus,
+.openLotForm input:focus,
+.openLotForm textarea:focus {
   border-color: var(--blue);
   outline: none;
 }
 
-.closeLotNotes {
+.openLotForm {
+  border-top: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 18px;
+  padding-top: 0;
+}
+
+.closeLotNotes,
+.openLotNotes {
   grid-column: 1 / -1;
 }
 
-.closeLotActions {
+.closeLotActions,
+.openLotActions {
   align-items: center;
   display: flex;
   gap: 12px;
@@ -1442,16 +1457,19 @@ section {
 }
 
 .closeLotActions span,
+.openLotActions span,
 .formMessage {
   color: var(--muted);
   font-size: 0.84rem;
 }
 
-.closeLotActions strong {
+.closeLotActions strong,
+.openLotActions strong {
   color: var(--text);
 }
 
-.closeLotActions button {
+.closeLotActions button,
+.openLotActions button {
   background: var(--blue);
   border: 0;
   border-radius: 8px;
@@ -1464,12 +1482,114 @@ section {
     transform var(--motion);
 }
 
-.closeLotActions button:hover {
+.closeLotActions button:hover,
+.openLotActions button:hover {
   filter: brightness(1.08);
   transform: translateY(-1px);
 }
 
-.closeLotActions button:disabled {
+.closeLotActions button:disabled,
+.openLotActions button:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.openLotActions,
+.openLotForm .formMessage {
+  grid-column: 1 / -1;
+}
+
+.sellTransaction + .sellTransaction {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.transactionEdit {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.transactionEdit summary {
+  color: var(--blue);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 800;
+  list-style: none;
+}
+
+.transactionEdit summary::-webkit-details-marker {
+  display: none;
+}
+
+.transactionEdit form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.transactionEdit label {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.76rem;
+  font-weight: 750;
+  gap: 6px;
+}
+
+.transactionEdit input,
+.transactionEdit select,
+.transactionEdit textarea {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.transactionEdit input:focus,
+.transactionEdit select:focus,
+.transactionEdit textarea:focus {
+  border-color: var(--blue);
+  outline: none;
+}
+
+.transactionEditNotes,
+.transactionEditActions,
+.transactionEdit .formMessage {
+  grid-column: 1 / -1;
+}
+
+.transactionEditActions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.transactionEditActions span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.transactionEditActions strong {
+  color: var(--text);
+}
+
+.transactionEditActions button {
+  background: var(--blue);
+  border: 0;
+  border-radius: 8px;
+  color: var(--accent-contrast);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 9px 11px;
+}
+
+.transactionEditActions button:disabled {
   cursor: progress;
   opacity: 0.72;
 }
@@ -1818,6 +1938,8 @@ svg:hover .investedLine {
   .lotItem summary,
   .lotDetails,
   .transactionPair,
+  .transactionEdit form,
+  .openLotForm,
   .lotFilterForm,
   .watchlistItem,
   .researchSearch > div {

@@ -7,6 +7,24 @@ function parseNumber(value: string | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function transactionTotal({
+  fees,
+  price,
+  quantity,
+  total,
+  type,
+}: {
+  fees: number;
+  price: number;
+  quantity: number;
+  total?: number;
+  type: string;
+}) {
+  if (type === "BUY") return quantity * price + fees;
+  if (type === "SELL") return quantity * price - fees;
+  return total ?? quantity * price + fees;
+}
+
 function splitCsvLine(line: string) {
   const values: string[] = [];
   let current = "";
@@ -30,13 +48,14 @@ function splitCsvLine(line: string) {
 
 export async function loadTransactions(): Promise<Transaction[]> {
   const filePath = path.join(process.cwd(), "data", "transactions.csv");
-  const content = await readFile(filePath, "utf8");
+  const examplePath = path.join(process.cwd(), "data", "transactions.example.csv");
+  const content = await readFile(filePath, "utf8").catch(() => readFile(examplePath, "utf8"));
   const [headerLine, ...rows] = content.trim().split(/\r?\n/);
   const headers = splitCsvLine(headerLine);
 
   return rows
     .filter((row) => row.trim())
-    .map((row) => {
+    .map((row, rowIndex) => {
       const values = splitCsvLine(row);
       const record = Object.fromEntries(
         headers.map((header, index) => [header, values[index] ?? ""]),
@@ -46,12 +65,17 @@ export async function loadTransactions(): Promise<Transaction[]> {
       const fees = parseNumber(record.fees);
       const enteredTotal = parseNumber(record.total);
       const type = String(record.type ?? "").toUpperCase().trim();
-      const total =
-        enteredTotal ||
-        (type === "SELL" ? quantity * price - fees : quantity * price + fees);
+      const total = transactionTotal({
+        fees,
+        price,
+        quantity,
+        total: enteredTotal || undefined,
+        type,
+      });
 
       return {
         id: String(record.transaction_id ?? record.id ?? "").trim(),
+        rowIndex,
         date: String(record.date ?? "").trim(),
         type,
         ticker: String(record.ticker ?? "").toUpperCase().trim(),
@@ -85,7 +109,7 @@ type OpenLot = {
   ticker: string;
 };
 
-function cashImpact(transaction: Transaction) {
+export function cashImpact(transaction: Transaction) {
   if (transaction.type === "SELL" || transaction.type === "DIVIDEND" || transaction.type === "DEPOSIT") {
     return transaction.total;
   }
@@ -191,6 +215,7 @@ export function buildTransactionLots(
       buyPrice: transaction.price,
       buyFees: transaction.fees,
       buyTotal: transaction.total,
+      buyTransaction: transaction,
       sellTransactions: [],
       sellProceeds: 0,
       averageSellPrice: null,
@@ -243,11 +268,13 @@ export function buildTransactionLots(
     const unrealizedProfit = currentPrice ? currentValue - lot.remainingCost : 0;
     const profit = lot.realizedProfit + unrealizedProfit;
     const closed = lot.remainingQuantity <= 0.00000001;
+    const status: TransactionLot["status"] = closed ? "closed" : "open";
     const investedBasis = lot.buyTotal || 0;
 
     return {
       ...publicLot,
-      status: closed ? "closed" : "open",
+      status,
+      remainingCost: closed ? 0 : lot.remainingCost,
       remainingQuantity: closed ? 0 : lot.remainingQuantity,
       averageSellPrice: lot.soldQuantity ? lot.sellProceeds / lot.soldQuantity : null,
       currentPrice,
@@ -256,6 +283,15 @@ export function buildTransactionLots(
       profit,
       profitPercent: investedBasis ? (profit / investedBasis) * 100 : 0,
       priceSource: currentPrice ? quote?.source ?? "Live quote" : "Unavailable",
+      sellTransactions: publicLot.sellTransactions.sort(
+        (a, b) => parseTransactionDate(a.date) - parseTransactionDate(b.date),
+      ),
     };
-  });
+  }).sort((a, b) => parseTransactionDate(b.buyDate) - parseTransactionDate(a.buyDate));
+}
+
+function parseTransactionDate(value: string) {
+  const [day, month, year] = value.split(/[/-]/);
+  const parsed = Date.parse(`${year}-${month}-${day}T00:00:00.000Z`);
+  return Number.isNaN(parsed) ? 0 : parsed;
 }

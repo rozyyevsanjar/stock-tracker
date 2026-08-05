@@ -113,6 +113,7 @@ export type TransactionType =
 
 export type Transaction = {
   id: string;
+  rowIndex: number;
   date: string;
   type: TransactionType | string;
   ticker: string;
@@ -142,11 +143,13 @@ export type TransactionLot = {
   status: "open" | "closed";
   buyDate: string;
   buyQuantity: number;
+  remainingCost: number;
   remainingQuantity: number;
   soldQuantity: number;
   buyPrice: number;
   buyFees: number;
   buyTotal: number;
+  buyTransaction: Transaction;
   sellTransactions: Transaction[];
   sellProceeds: number;
   averageSellPrice: number | null;
