@@ -18,3 +18,4 @@ next-env.d.ts
 # Personal portfolio data
 data/*.csv
 !data/*.example.csv
+.vercel
