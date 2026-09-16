@@ -3,7 +3,5 @@
 .next/
 node_modules/
 
-# Keep tracker-positions.csv deployable for the Tracker tab, but do not upload
-# the older private portfolio and transaction ledgers.
-data/portfolio.csv
-data/transactions.csv
+# Private portfolio CSVs stay out of Git through .gitignore, but manual Vercel
+# deploys include them so the personal dashboard uses your real local data.
