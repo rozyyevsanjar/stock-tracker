@@ -7,8 +7,9 @@ import {
   fetchQuotes,
   fetchResearchOverview,
 } from "@/lib/market";
-import { formatMoney, formatPercent, formatShares, signed } from "@/lib/format";
+import { formatCurrency, formatMoney, formatPercent, formatShares, signed } from "@/lib/format";
 import { buildTransactionLots, cashImpact, loadTransactions } from "@/lib/transactions";
+import { buildTrackedPositions, loadTrackerPositions } from "@/lib/tracker";
 import { assetLogoFallback, assetLogoUrl } from "@/lib/logos";
 import type {
   Holding,
@@ -17,6 +18,7 @@ import type {
   Quote,
   ResearchNewsItem,
   ResearchProfile,
+  TrackedPosition,
   TransactionLot,
 } from "@/lib/types";
 import { MarketStatus } from "./market-status";
@@ -30,7 +32,7 @@ import type { ReactNode } from "react";
 
 export const revalidate = 900;
 
-type Tab = "home" | "transactions" | "research" | "learn";
+type Tab = "home" | "tracker" | "transactions" | "research" | "learn";
 type LotStatusFilter = "all" | "open" | "closed";
 type LotResultFilter = "all" | "profitable" | "loss" | "flat";
 type LotSort = "newest" | "oldest" | "profit" | "loss" | "value";
@@ -219,6 +221,7 @@ function HoldingValueChart({ holdings }: { holdings: Holding[] }) {
 function TabBar({ activeTab }: { activeTab: Tab }) {
   const tabs: Array<{ label: string; value: Tab; href: string }> = [
     { label: "Home", value: "home", href: "/" },
+    { label: "Tracker", value: "tracker", href: "/?tab=tracker" },
     { label: "Transaction history", value: "transactions", href: "/?tab=transactions" },
     { label: "Research", value: "research", href: "/?tab=research" },
     { label: "Learn", value: "learn", href: "/?tab=learn" },
@@ -430,6 +433,157 @@ function AssetLogo({ ticker, name }: { ticker: string; name?: string }) {
       <img alt="" className="assetLogo" src={assetLogoUrl(ticker, name)} />
       <span>{assetLogoFallback(ticker)}</span>
     </span>
+  );
+}
+
+function TrackerTicker({ position }: { position: TrackedPosition }) {
+  const ticker = position.marketTicker || position.ticker;
+  const content = (
+    <>
+      <AssetLogo name={position.asset} ticker={ticker} />
+      <span className="tickerText">
+        <span className="tickerSymbol">{position.ticker}</span>
+        <span className="tickerCompany">{position.asset}</span>
+      </span>
+    </>
+  );
+
+  if (!position.marketTicker) {
+    return <span className="tickerIdentity">{content}</span>;
+  }
+
+  return (
+    <SymbolLink className="tickerIdentity" name={position.asset} ticker={ticker}>
+      {content}
+    </SymbolLink>
+  );
+}
+
+function currencyTotals(positions: TrackedPosition[], selector: (position: TrackedPosition) => number) {
+  const totals = new Map<string, number>();
+  for (const position of positions) {
+    const currency = position.priceCurrency || position.valueCurrency || "USD";
+    totals.set(currency, (totals.get(currency) ?? 0) + selector(position));
+  }
+  return Array.from(totals.entries()).sort(([a], [b]) => a.localeCompare(b));
+}
+
+function formatCurrencyList(totals: Array<[string, number]>) {
+  if (!totals.length) return "-";
+  return totals.map(([currency, value]) => formatCurrency(value, currency)).join(" / ");
+}
+
+function TrackerView({ positions }: { positions: TrackedPosition[] }) {
+  const liveCount = positions.filter((position) => position.usesLivePrice).length;
+  const valueTotals = currencyTotals(positions, (position) => position.currentValue);
+  const profitTotals = currencyTotals(positions, (position) => position.profit);
+  const platformTotals = Array.from(
+    positions.reduce((totals, position) => {
+      const key = `${position.platform || "Other"}|${position.priceCurrency || position.valueCurrency || "USD"}`;
+      totals.set(key, (totals.get(key) ?? 0) + position.currentValue);
+      return totals;
+    }, new Map<string, number>()),
+  ).sort(([a], [b]) => a.localeCompare(b));
+
+  return (
+    <>
+      <section className="metricsGrid">
+        <MetricCard
+          label="Tracked assets"
+          value={String(positions.length)}
+          delta={`${liveCount} live, ${positions.length - liveCount} snapshot`}
+          help="Positions imported from the current investment positions workbook."
+        />
+        <MetricCard
+          label="Current value"
+          value={formatCurrencyList(valueTotals)}
+          help="Current market value grouped by currency. Currencies are not converted or mixed."
+        />
+        <MetricCard
+          label="Profit / loss"
+          value={formatCurrencyList(profitTotals)}
+          valueTone={tone(profitTotals.reduce((total, [, value]) => total + value, 0))}
+          help="Unrealized P/L grouped by currency, using live prices where available."
+        />
+        <MetricCard
+          label="Price source"
+          value={liveCount === positions.length ? "Live" : "Mixed"}
+          help="Live rows come from Yahoo Finance or CoinGecko. Snapshot rows use the workbook values."
+        />
+      </section>
+
+      <section>
+        <div className="sectionHeader">
+          <div>
+            <h2>Tracked positions</h2>
+            <p className="sectionNote">
+              Live market prices are used when a market ticker is available. Gold and silver currently use
+              the workbook snapshot.
+            </p>
+          </div>
+          <span className="statusPill">XLSX import</span>
+        </div>
+
+        <div className="trackerTableWrap">
+          <table className="trackerTable">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Platform</th>
+                <th>Qty</th>
+                <th>Avg price</th>
+                <th>Current price</th>
+                <th>Current value</th>
+                <th>P/L</th>
+                <th>Return</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {positions.map((position) => {
+                const currency = position.priceCurrency || position.valueCurrency || "USD";
+                return (
+                  <tr key={`${position.platform}-${position.asset}-${position.quantity}`}>
+                    <td>
+                      <TrackerTicker position={position} />
+                    </td>
+                    <td>
+                      <span className="typePill split">{position.platform || "Other"}</span>
+                    </td>
+                    <td>{formatShares(position.quantity)} {position.unit}</td>
+                    <td>{formatCurrency(position.avgPrice, currency)}</td>
+                    <td>{formatCurrency(position.currentPrice, currency)}</td>
+                    <td>{formatCurrency(position.currentValue, currency)}</td>
+                    <td className={tone(position.profit)}>{formatCurrency(position.profit, currency)}</td>
+                    <td className={tone(position.returnPercent)}>{formatPercent(position.returnPercent)}</td>
+                    <td>
+                      <span className={`sourceBadge ${position.usesLivePrice ? "live" : ""}`}>
+                        {position.marketSource}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Platform value</h2>
+        <div className="trackerPlatformList">
+          {platformTotals.map(([key, value]) => {
+            const [platform, currency] = key.split("|");
+            return (
+              <div className="trackerPlatformRow" key={key}>
+                <span>{platform}</span>
+                <strong>{formatCurrency(value, currency)}</strong>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -684,6 +838,7 @@ function normalizeTab(value: string | string[] | undefined): Tab {
   const raw = Array.isArray(value) ? value[0] : value;
   if (raw === "research") return "research";
   if (raw === "learn") return "learn";
+  if (raw === "tracker") return "tracker";
   return raw === "transactions" ? "transactions" : "home";
 }
 
@@ -875,6 +1030,29 @@ export default async function Home({
           symbol={symbol}
           timeframe={timeframe}
         />
+      </main>
+    );
+  }
+
+  if (activeTab === "tracker") {
+    const trackerPositions = await loadTrackerPositions();
+    const marketTickers = trackerPositions
+      .map((position) => position.marketTicker)
+      .filter(Boolean);
+    const quotes = await fetchQuotes(marketTickers);
+    const trackedPositions = buildTrackedPositions(trackerPositions, quotes);
+
+    return (
+      <main>
+        <TopBar activeTab={activeTab} />
+        <header className="pageHeader">
+          <div>
+            <h1>Tracker</h1>
+            <p>Current positions from your investment workbook, checked against market prices.</p>
+          </div>
+          <span className="statusPill">Live + snapshot</span>
+        </header>
+        <TrackerView positions={trackedPositions} />
       </main>
     );
   }

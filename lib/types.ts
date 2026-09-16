@@ -161,3 +161,34 @@ export type TransactionLot = {
   profitPercent: number;
   priceSource: string;
 };
+
+export type TrackerPosition = {
+  asset: string;
+  assetType: string;
+  avgPrice: number;
+  marketTicker: string;
+  notes: string;
+  platform: string;
+  plCurrency: string;
+  priceCurrency: string;
+  quantity: number;
+  snapshotPl: number | null;
+  snapshotPrice: number | null;
+  snapshotReturn: number | null;
+  snapshotValue: number | null;
+  ticker: string;
+  unit: string;
+  valueCurrency: string;
+};
+
+export type TrackedPosition = TrackerPosition & {
+  costBasis: number;
+  currentPrice: number;
+  currentValue: number;
+  dailyChange: number | null;
+  dailyChangePercent: number | null;
+  marketSource: string;
+  profit: number;
+  returnPercent: number;
+  usesLivePrice: boolean;
+};

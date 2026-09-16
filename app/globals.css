@@ -515,6 +515,80 @@ section {
   text-align: left;
 }
 
+.trackerTableWrap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.trackerTable {
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 1120px;
+  width: 100%;
+}
+
+.trackerTable th,
+.trackerTable td {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 10px;
+  text-align: right;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.trackerTable th {
+  background: color-mix(in srgb, var(--panel-2), transparent 18%);
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.trackerTable th:first-child,
+.trackerTable td:first-child {
+  min-width: 260px;
+  text-align: left;
+}
+
+.trackerTable tbody tr:hover {
+  background: color-mix(in srgb, var(--blue), transparent 92%);
+}
+
+.sourceBadge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 750;
+  padding: 5px 9px;
+}
+
+.sourceBadge.live {
+  border-color: color-mix(in srgb, var(--green), transparent 55%);
+  color: var(--green);
+}
+
+.trackerPlatformList {
+  display: grid;
+  gap: 10px;
+}
+
+.trackerPlatformRow {
+  align-items: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.trackerPlatformRow span {
+  color: var(--muted);
+}
+
 .tableShell {
   border: 1px solid var(--line);
   border-radius: 8px;

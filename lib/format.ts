@@ -1,7 +1,11 @@
 export function formatMoney(value: number, digits = 2) {
+  return formatCurrency(value, "USD", digits);
+}
+
+export function formatCurrency(value: number, currency = "USD", digits = 2) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency,
     maximumFractionDigits: digits,
     minimumFractionDigits: digits,
   }).format(value);

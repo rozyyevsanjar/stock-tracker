@@ -8,6 +8,7 @@ A Next.js dashboard for tracking a small personal portfolio. It reads local CSV 
 - Portfolio summary with invested value, current value, daily movement, and unrealized return.
 - Holdings and allocation views.
 - Performance chart with selectable time ranges.
+- Tracker tab for current investment positions with live market checks where possible.
 - Transaction ledger support for buys, sells, dividends, deposits, withdrawals, fees, and linked lots.
 - Open new lots from the transaction history screen.
 - Inline transaction editing from the lot detail view.
@@ -49,6 +50,7 @@ Required for current holdings, lots, and closed-position updates:
 
 ```text
 data/transactions.csv
+data/tracker-positions.csv
 ```
 
 Legacy/simple holdings examples are still available:
@@ -61,6 +63,7 @@ Example files are included:
 
 ```text
 data/portfolio.example.csv
+data/tracker-positions.example.csv
 data/transactions.example.csv
 ```
 
@@ -68,9 +71,10 @@ If you do not have the real CSV files yet, copy the example files and edit them:
 
 ```bash
 cp data/transactions.example.csv data/transactions.csv
+cp data/tracker-positions.example.csv data/tracker-positions.csv
 ```
 
-Dates are written as `DD/MM/YYYY`. Crypto tickers use Yahoo-style symbols such as `ETH-USD`.
+Dates are written as `DD/MM/YYYY`. Crypto tickers use Yahoo-style symbols such as `ETH-USD`. The tracker file can include a `market_ticker` column for live prices and leave it blank for manually tracked assets such as precious metals.
 
 ## Scripts
 
