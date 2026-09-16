@@ -164,7 +164,8 @@ function LiveTicker({
           </p>
         ) : holdingLots.length === 0 ? (
           <p className="muted">
-            {holding.priceSource} for {formatShares(holding.shares)} units.
+            {holding.priceSource} for {formatShares(holding.shares)}{" "}
+            {holding.ticker === "GOLD" || holding.ticker === "SILVER" ? "g" : "shares"}.
           </p>
         ) : (
           <table className="compactTable">
@@ -1040,7 +1041,7 @@ function convertPerformance(points: PerformancePoint[], rate: number): Performan
   }));
 }
 
-function trackedCommodityToHolding(
+function trackedPositionToHolding(
   position: TrackedPosition & {
     costBasisDisplay: number;
     currentPriceDisplay: number;
@@ -1105,10 +1106,15 @@ function withAllocation(holdings: Holding[]) {
     .sort((a, b) => b.currentValue - a.currentValue);
 }
 
-function trackerCommodityPositions(positions: TrackerPosition[]) {
+function trackerHomePositions(positions: TrackerPosition[], portfolioTickers: Set<string>) {
   return positions.filter((position) => {
     const ticker = position.ticker.toUpperCase();
-    return position.assetType.toLowerCase() === "commodity" || ticker === "GOLD" || ticker === "SILVER";
+    const marketTicker = position.marketTicker.toUpperCase();
+    const isCommodity =
+      position.assetType.toLowerCase() === "commodity" || ticker === "GOLD" || ticker === "SILVER";
+    const alreadyInPortfolio =
+      portfolioTickers.has(ticker) || (marketTicker ? portfolioTickers.has(marketTicker) : false);
+    return isCommodity || !alreadyInPortfolio;
   });
 }
 
@@ -1363,8 +1369,14 @@ export default async function Home({
     loadPortfolioStateFromTransactions(),
     loadTrackerPositions(),
   ]);
-  const commodityPositions = trackerCommodityPositions(trackerPositions);
-  const tickers = Array.from(new Set(lots.map((lot) => lot.ticker)));
+  const portfolioTickerSet = new Set(lots.map((lot) => lot.ticker));
+  const homeTrackerPositions = trackerHomePositions(trackerPositions, portfolioTickerSet);
+  const tickers = Array.from(
+    new Set([
+      ...lots.map((lot) => lot.ticker),
+      ...homeTrackerPositions.map((position) => position.marketTicker).filter(Boolean),
+    ]),
+  );
   const firstPurchaseDate = lots
     .map((lot) => parsePurchaseDate(lot.purchaseDate))
     .filter((date): date is Date => Boolean(date))
@@ -1378,15 +1390,15 @@ export default async function Home({
   const usdDisplayRate = currencyRates.get("USD") ?? 1;
   const aedDisplayRate = currencyRates.get("AED") ?? 1;
   const portfolioHoldings = convertHoldings(aggregateLots(lots, quotes, cashBalance), usdDisplayRate);
-  const commodityHoldings = convertTrackedPositions(
-    buildTrackedPositions(commodityPositions, {}, metalPrices),
+  const trackerHoldings = convertTrackedPositions(
+    buildTrackedPositions(homeTrackerPositions, quotes, metalPrices),
     displayCurrency,
     currencyRates,
-  ).map(trackedCommodityToHolding);
+  ).map(trackedPositionToHolding);
   const holdings = withAllocation([
     savingsHolding(aedDisplayRate),
     ...portfolioHoldings,
-    ...commodityHoldings,
+    ...trackerHoldings,
   ]);
   const displayLots = convertLots(lots, usdDisplayRate);
   const performance = convertPerformance(buildPerformance(history, lots), usdDisplayRate);
