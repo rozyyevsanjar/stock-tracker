@@ -205,7 +205,7 @@ function AllocationTable({ holdings }: { holdings: Holding[] }) {
   return (
     <section>
       <h2>
-        Allocation <span className="help" title="How your current account value is split across holdings. Cash is included.">?</span>
+        Allocation <span className="help" title="How your current account value is split across visible holdings.">?</span>
       </h2>
       <div className="allocationList">
         {holdings.map((holding) => (
@@ -1263,7 +1263,7 @@ export default async function Home({
           fetchResearchOverview(symbol),
         ])
       : [await fetchQuotes(quoteTickers), [] as PricePoint[], { profile: null, news: [] }];
-    const holdings = aggregateLots(lots, quotes, cashBalance);
+    const holdings = aggregateLots(lots, quotes, cashBalance).filter((holding) => holding.ticker !== "CASH");
     const exposureHolding = symbol
       ? holdings.find((holding) => holding.ticker === symbol) ?? null
       : null;
@@ -1389,7 +1389,10 @@ export default async function Home({
   ]);
   const usdDisplayRate = currencyRates.get("USD") ?? 1;
   const aedDisplayRate = currencyRates.get("AED") ?? 1;
-  const portfolioHoldings = convertHoldings(aggregateLots(lots, quotes, cashBalance), usdDisplayRate);
+  const portfolioHoldings = convertHoldings(
+    aggregateLots(lots, quotes, cashBalance).filter((holding) => holding.ticker !== "CASH"),
+    usdDisplayRate,
+  );
   const trackerHoldings = convertTrackedPositions(
     buildTrackedPositions(homeTrackerPositions, quotes, metalPrices),
     displayCurrency,
