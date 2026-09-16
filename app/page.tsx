@@ -22,6 +22,7 @@ import { assetLogoFallback, assetLogoUrl } from "@/lib/logos";
 import type {
   Holding,
   Lot,
+  PerformancePoint,
   PricePoint,
   Quote,
   ResearchNewsItem,
@@ -89,7 +90,15 @@ function MetricCard({
   );
 }
 
-function LiveTicker({ holding, lots }: { holding: Holding; lots: Lot[] }) {
+function LiveTicker({
+  displayCurrency,
+  holding,
+  lots,
+}: {
+  displayCurrency: DisplayCurrency;
+  holding: Holding;
+  lots: Lot[];
+}) {
   const holdingLots = lots.filter((lot) => lot.ticker === holding.ticker);
 
   return (
@@ -107,9 +116,9 @@ function LiveTicker({ holding, lots }: { holding: Holding; lots: Lot[] }) {
           </span>
         </SymbolLink>
         <span className="tickerPrice">
-          <span>{formatMoney(holding.currentPrice)}</span>
+          <span>{formatCurrency(holding.currentPrice, displayCurrency)}</span>
           <span className={`tickerDelta ${tone(holding.dailyChange)}`}>
-            {signed(holding.dailyChange, (value) => formatMoney(value))} (
+            {signed(holding.dailyChange, (value) => formatCurrency(value, displayCurrency))} (
             {formatPercent(Math.abs(holding.dailyChangePercent))})
           </span>
         </span>
@@ -120,12 +129,12 @@ function LiveTicker({ holding, lots }: { holding: Holding; lots: Lot[] }) {
           <span>Shares</span>
           <strong>{formatShares(holding.shares)}</strong>
           <span>Avg buy</span>
-          <strong>{formatMoney(holding.buyPrice)}</strong>
+          <strong>{formatCurrency(holding.buyPrice, displayCurrency)}</strong>
           <span>Value</span>
-          <strong>{formatMoney(holding.currentValue)}</strong>
+          <strong>{formatCurrency(holding.currentValue, displayCurrency)}</strong>
           <span>P/L</span>
           <strong className={tone(holding.profit)}>
-            {formatMoney(holding.profit)} ({formatPercent(holding.profitPercent)})
+            {formatCurrency(holding.profit, displayCurrency)} ({formatPercent(holding.profitPercent)})
           </strong>
         </div>
 
@@ -151,9 +160,9 @@ function LiveTicker({ holding, lots }: { holding: Holding; lots: Lot[] }) {
                   <tr key={`${lot.ticker}-${lot.purchaseDate}-${lot.shares}`}>
                     <td>{lot.purchaseDate || "Unknown"}</td>
                     <td>{formatShares(lot.shares)}</td>
-                    <td>{formatMoney(lot.buyPrice)}</td>
-                    <td>{formatMoney(cost)}</td>
-                    <td className={tone(profit)}>{formatMoney(profit)}</td>
+                    <td>{formatCurrency(lot.buyPrice, displayCurrency)}</td>
+                    <td>{formatCurrency(cost, displayCurrency)}</td>
+                    <td className={tone(profit)}>{formatCurrency(profit, displayCurrency)}</td>
                   </tr>
                 );
               })}
@@ -196,7 +205,13 @@ function AllocationTable({ holdings }: { holdings: Holding[] }) {
   );
 }
 
-function HoldingValueChart({ holdings }: { holdings: Holding[] }) {
+function HoldingValueChart({
+  displayCurrency,
+  holdings,
+}: {
+  displayCurrency: DisplayCurrency;
+  holdings: Holding[];
+}) {
   const max = Math.max(...holdings.map((holding) => holding.currentValue), 1);
   return (
     <section>
@@ -218,7 +233,7 @@ function HoldingValueChart({ holdings }: { holdings: Holding[] }) {
                 style={{ width: `${(holding.currentValue / max) * 100}%` }}
               />
             </div>
-            <strong>{formatMoney(holding.currentValue)}</strong>
+            <strong>{formatCurrency(holding.currentValue, displayCurrency)}</strong>
           </div>
         ))}
       </div>
@@ -467,20 +482,55 @@ function TrackerTicker({ position }: { position: TrackedPosition }) {
   );
 }
 
-function CurrencySelector({ activeCurrency }: { activeCurrency: DisplayCurrency }) {
+function CurrencySelector({
+  activeCurrency,
+  range,
+  tab = "tracker",
+}: {
+  activeCurrency: DisplayCurrency;
+  range?: Timeframe;
+  tab?: Tab;
+}) {
   return (
-    <nav className="currencyNav" aria-label="Tracker display currency">
-      {DISPLAY_CURRENCIES.map((currency) => (
-        <a
-          aria-current={activeCurrency === currency ? "page" : undefined}
-          className={activeCurrency === currency ? "active" : ""}
-          href={`/?tab=tracker&currency=${currency}`}
-          key={currency}
-        >
-          {currency}
-        </a>
-      ))}
+    <nav className="currencyNav" aria-label="Display currency">
+      {DISPLAY_CURRENCIES.map((currency) => {
+        const params = new URLSearchParams();
+        if (tab !== "home") params.set("tab", tab);
+        if (range) params.set("range", range);
+        params.set("currency", currency);
+
+        return (
+          <a
+            aria-current={activeCurrency === currency ? "page" : undefined}
+            className={activeCurrency === currency ? "active" : ""}
+            href={`/?${params.toString()}`}
+            key={currency}
+          >
+            {currency}
+          </a>
+        );
+      })}
     </nav>
+  );
+}
+
+function CurrencyControl({
+  activeCurrency,
+  range,
+  tab,
+}: {
+  activeCurrency: DisplayCurrency;
+  range?: Timeframe;
+  tab: Tab;
+}) {
+  return (
+    <div className="trackerControls">
+      <div>
+        <h2>Display currency</h2>
+        <p className="sectionNote">All values are converted using live FX rates.</p>
+      </div>
+      <CurrencySelector activeCurrency={activeCurrency} range={range} tab={tab} />
+    </div>
   );
 }
 
@@ -513,13 +563,7 @@ function TrackerView({
 
   return (
     <>
-      <div className="trackerControls">
-        <div>
-          <h2>Display currency</h2>
-          <p className="sectionNote">All tracker values are converted using live FX rates.</p>
-        </div>
-        <CurrencySelector activeCurrency={displayCurrency} />
-      </div>
+      <CurrencyControl activeCurrency={displayCurrency} tab="tracker" />
 
       <section className="metricsGrid">
         <MetricCard
@@ -884,6 +928,39 @@ function normalizeDisplayCurrency(value: string | string[] | undefined): Display
   return raw === "EUR" || raw === "AED" ? raw : "USD";
 }
 
+function convertHoldings(holdings: Holding[], rate: number): Holding[] {
+  return holdings.map((holding) => ({
+    ...holding,
+    buyPrice: holding.buyPrice * rate,
+    currentPrice: holding.currentPrice * rate,
+    currentValue: holding.currentValue * rate,
+    dailyChange: holding.dailyChange * rate,
+    fees: holding.fees * rate,
+    invested: holding.invested * rate,
+    previousPrice: holding.previousPrice * rate,
+    previousValue: holding.previousValue * rate,
+    profit: holding.profit * rate,
+    valueDailyChange: holding.valueDailyChange * rate,
+  }));
+}
+
+function convertLots(lots: Lot[], rate: number): Lot[] {
+  return lots.map((lot) => ({
+    ...lot,
+    buyPrice: lot.buyPrice * rate,
+    fees: lot.fees * rate,
+  }));
+}
+
+function convertPerformance(points: PerformancePoint[], rate: number): PerformancePoint[] {
+  return points.map((point) => ({
+    ...point,
+    invested: point.invested * rate,
+    marketValue: point.marketValue * rate,
+    profit: point.profit * rate,
+  }));
+}
+
 function normalizeLotStatus(value: string | string[] | undefined): LotStatusFilter {
   const raw = oneParam(value);
   return raw === "open" || raw === "closed" ? raw : "all";
@@ -1130,18 +1207,22 @@ export default async function Home({
     );
   }
 
+  const displayCurrency = normalizeDisplayCurrency(params.currency);
   const { cashBalance, lots } = await loadPortfolioStateFromTransactions();
   const tickers = Array.from(new Set(lots.map((lot) => lot.ticker)));
   const firstPurchaseDate = lots
     .map((lot) => parsePurchaseDate(lot.purchaseDate))
     .filter((date): date is Date => Boolean(date))
     .sort((a, b) => a.getTime() - b.getTime())[0];
-  const [quotes, history] = await Promise.all([
+  const [quotes, history, currencyRates] = await Promise.all([
     fetchQuotes(tickers),
     fetchPriceHistory(tickers, timeframe, firstPurchaseDate),
+    fetchCurrencyRates(displayCurrency),
   ]);
-  const holdings = aggregateLots(lots, quotes, cashBalance);
-  const performance = buildPerformance(history, lots);
+  const usdDisplayRate = currencyRates.get("USD") ?? 1;
+  const holdings = convertHoldings(aggregateLots(lots, quotes, cashBalance), usdDisplayRate);
+  const displayLots = convertLots(lots, usdDisplayRate);
+  const performance = convertPerformance(buildPerformance(history, lots), usdDisplayRate);
 
   const totalInvested = holdings.reduce((total, holding) => total + holding.invested, 0);
   const totalValue = holdings.reduce((total, holding) => total + holding.currentValue, 0);
@@ -1163,24 +1244,26 @@ export default async function Home({
         <span className="statusPill">Live market data</span>
       </header>
 
+      <CurrencyControl activeCurrency={displayCurrency} range={timeframe} tab="home" />
+
       <section className="metricsGrid">
         <MetricCard
           label="Total invested"
-          value={formatMoney(totalInvested)}
+          value={formatCurrency(totalInvested, displayCurrency)}
           help="The total amount you put into open stock and crypto positions. Cash is excluded."
         />
         <MetricCard
           label="Portfolio value"
-          value={formatMoney(totalValue)}
-          delta={`${signed(dailyChange, formatMoney)} today`}
+          value={formatCurrency(totalValue, displayCurrency)}
+          delta={`${signed(dailyChange, (value) => formatCurrency(value, displayCurrency))} today`}
           deltaValue={dailyChange}
           help="The current value of all holdings, including uninvested cash."
         />
         <MetricCard
           label="Profit / loss"
-          value={formatMoney(totalProfit)}
+          value={formatCurrency(totalProfit, displayCurrency)}
           valueTone={tone(totalProfit)}
-          delta={`${signed(dailyChange, formatMoney)} today`}
+          delta={`${signed(dailyChange, (value) => formatCurrency(value, displayCurrency))} today`}
           deltaValue={dailyChange}
           help="Unrealized profit or loss on open investments. It excludes cash and is not locked in until you sell."
         />
@@ -1194,19 +1277,24 @@ export default async function Home({
         />
       </section>
 
-      <PerformanceChart points={performance} timeframe={timeframe} />
+      <PerformanceChart currency={displayCurrency} points={performance} timeframe={timeframe} />
 
       <section>
         <h2>Live price ticker</h2>
         <div className="tickerGrid">
           {holdings.map((holding) => (
-            <LiveTicker key={holding.ticker} holding={holding} lots={lots} />
+            <LiveTicker
+              displayCurrency={displayCurrency}
+              key={holding.ticker}
+              holding={holding}
+              lots={displayLots}
+            />
           ))}
         </div>
       </section>
 
       <div className="dashboardGrid">
-        <HoldingValueChart holdings={holdings} />
+        <HoldingValueChart displayCurrency={displayCurrency} holdings={holdings} />
         <AllocationTable holdings={holdings} />
       </div>
     </main>

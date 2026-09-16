@@ -3,10 +3,11 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatCurrency, formatPercent } from "@/lib/format";
 import type { PerformancePoint } from "@/lib/types";
 
 type Timeframe = "1d" | "1w" | "1m" | "1y" | "all";
+type DisplayCurrency = "USD" | "EUR" | "AED";
 
 const TIMEFRAMES: Array<{ label: string; value: Timeframe }> = [
   { label: "1D", value: "1d" },
@@ -24,9 +25,17 @@ function tone(value: number) {
   return "neutral";
 }
 
-function formatAxisMoney(value: number) {
-  if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(1)}k`;
-  return `$${Math.round(value)}`;
+function formatAxisMoney(value: number, currency: DisplayCurrency) {
+  const symbol = new Intl.NumberFormat("en-US", {
+    currency,
+    currencyDisplay: "narrowSymbol",
+    style: "currency",
+  })
+    .formatToParts(0)
+    .find((part) => part.type === "currency")?.value ?? currency;
+
+  if (Math.abs(value) >= 1000) return `${symbol}${(value / 1000).toFixed(1)}k`;
+  return `${symbol}${Math.round(value)}`;
 }
 
 function formatAxisDate(value: string, timeframe: Timeframe) {
@@ -61,9 +70,11 @@ function formatTooltipDate(value: string, timeframe: Timeframe) {
 }
 
 export function PerformanceChart({
+  currency,
   points,
   timeframe,
 }: {
+  currency: DisplayCurrency;
   points: PerformancePoint[];
   timeframe: Timeframe;
 }) {
@@ -87,7 +98,8 @@ export function PerformanceChart({
   }
 
   function timeframeHref(nextTimeframe: Timeframe) {
-    return `${pathname}?range=${nextTimeframe}#portfolio-performance`;
+    const params = new URLSearchParams({ currency, range: nextTimeframe });
+    return `${pathname}?${params.toString()}#portfolio-performance`;
   }
 
   if (!points.length) {
@@ -162,7 +174,7 @@ export function PerformanceChart({
                 className="gridLine"
               />
               <text x={padding.left - 10} y={tick.y + 4} className="axisLabel" textAnchor="end">
-                {formatAxisMoney(tick.value)}
+                {formatAxisMoney(tick.value, currency)}
               </text>
             </g>
           ))}
@@ -215,13 +227,13 @@ export function PerformanceChart({
                 <g className="svgTooltip" transform={`translate(${pointX + tooltipX} ${valueY + tooltipY})`}>
                   <rect width="178" height="78" rx="8" />
                   <text x="10" y="18" className="tooltipTitle">{tooltipDate}</text>
-                  <text x="10" y="34">Value: {formatMoney(point.marketValue)}</text>
-                  <text x="10" y="48">Invested: {formatMoney(point.invested)}</text>
-                  <text x="10" y="62">P/L: {formatMoney(point.profit)}</text>
+                  <text x="10" y="34">Value: {formatCurrency(point.marketValue, currency)}</text>
+                  <text x="10" y="48">Invested: {formatCurrency(point.invested, currency)}</text>
+                  <text x="10" y="62">P/L: {formatCurrency(point.profit, currency)}</text>
                   <text x="10" y="74">Return: {formatPercent(point.returnPercent)}</text>
                 </g>
                 <circle
-                  aria-label={`${tooltipDate} portfolio value ${formatMoney(point.marketValue)}`}
+                  aria-label={`${tooltipDate} portfolio value ${formatCurrency(point.marketValue, currency)}`}
                   className="dataHitArea"
                   cx={pointX}
                   cy={valueY}
@@ -238,9 +250,9 @@ export function PerformanceChart({
         </div>
       </div>
       <div className="performanceSummary">
-        <span>Latest value: <strong>{formatMoney(latest.marketValue)}</strong></span>
-        <span>Invested: <strong>{formatMoney(latest.invested)}</strong></span>
-        <span>P/L: <strong className={tone(latest.profit)}>{formatMoney(latest.profit)}</strong></span>
+        <span>Latest value: <strong>{formatCurrency(latest.marketValue, currency)}</strong></span>
+        <span>Invested: <strong>{formatCurrency(latest.invested, currency)}</strong></span>
+        <span>P/L: <strong className={tone(latest.profit)}>{formatCurrency(latest.profit, currency)}</strong></span>
         <span>Return: <strong className={tone(latest.returnPercent)}>{formatPercent(latest.returnPercent)}</strong></span>
       </div>
     </section>
