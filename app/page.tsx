@@ -46,6 +46,8 @@ type Tab = "home" | "tracker" | "transactions" | "research" | "learn";
 type LotStatusFilter = "all" | "open" | "closed";
 type LotResultFilter = "all" | "profitable" | "loss" | "flat";
 type LotSort = "newest" | "oldest" | "profit" | "loss" | "value";
+const SAVINGS_BALANCE_AED = 60163;
+const SAVINGS_INTEREST_RATE = 3.5;
 
 type LotFilters = {
   result: LotResultFilter;
@@ -126,21 +128,40 @@ function LiveTicker({
       </summary>
 
       <div className="tickerDetails">
-        <div className="detailGrid">
-          <span>Shares</span>
-          <strong>{formatShares(holding.shares)}</strong>
-          <span>Avg buy</span>
-          <strong>{formatCurrency(holding.buyPrice, displayCurrency)}</strong>
-          <span>Value</span>
-          <strong>{formatCurrency(holding.currentValue, displayCurrency)}</strong>
-          <span>P/L</span>
-          <strong className={tone(holding.profit)}>
-            {formatCurrency(holding.profit, displayCurrency)} ({formatPercent(holding.profitPercent)})
-          </strong>
-        </div>
+        {holding.ticker === "SAVINGS" ? (
+          <div className="detailGrid">
+            <span>Balance</span>
+            <strong>{formatCurrency(holding.currentValue, displayCurrency)}</strong>
+            <span>Yearly rate</span>
+            <strong>{formatPercent(SAVINGS_INTEREST_RATE)}</strong>
+            <span>Yearly interest</span>
+            <strong>
+              {formatCurrency(holding.currentValue * (SAVINGS_INTEREST_RATE / 100), displayCurrency)}
+            </strong>
+            <span>Source</span>
+            <strong>AED savings</strong>
+          </div>
+        ) : (
+          <div className="detailGrid">
+            <span>Shares</span>
+            <strong>{formatShares(holding.shares)}</strong>
+            <span>Avg buy</span>
+            <strong>{formatCurrency(holding.buyPrice, displayCurrency)}</strong>
+            <span>Value</span>
+            <strong>{formatCurrency(holding.currentValue, displayCurrency)}</strong>
+            <span>P/L</span>
+            <strong className={tone(holding.profit)}>
+              {formatCurrency(holding.profit, displayCurrency)} ({formatPercent(holding.profitPercent)})
+            </strong>
+          </div>
+        )}
 
         {holding.ticker === "CASH" ? (
           <p className="muted">Cash is tracked as uninvested account value.</p>
+        ) : holding.ticker === "SAVINGS" ? (
+          <p className="muted">
+            Savings are stored as AED {formatShares(SAVINGS_BALANCE_AED)} and converted for display.
+          </p>
         ) : holdingLots.length === 0 ? (
           <p className="muted">
             {holding.priceSource} for {formatShares(holding.shares)} units.
@@ -438,7 +459,7 @@ function SymbolLink({
   name?: string;
   showLogo?: boolean;
 }) {
-  if (ticker === "CASH") {
+  if (ticker === "CASH" || ticker === "SAVINGS") {
     return (
       <span className={className}>
         {showLogo ? <AssetLogo name={name} ticker={ticker} /> : null}
@@ -996,6 +1017,31 @@ function trackedCommodityToHolding(
   };
 }
 
+function savingsHolding(aedDisplayRate: number): Holding {
+  const value = SAVINGS_BALANCE_AED * aedDisplayRate;
+
+  return {
+    ticker: "SAVINGS",
+    company: "Savings",
+    shares: 1,
+    buyPrice: value,
+    invested: value,
+    fees: 0,
+    lots: 1,
+    currentPrice: value,
+    previousPrice: value,
+    dailyChange: 0,
+    dailyChangePercent: 0,
+    currentValue: value,
+    previousValue: value,
+    valueDailyChange: 0,
+    profit: 0,
+    profitPercent: 0,
+    allocationPercent: 0,
+    priceSource: `${formatPercent(SAVINGS_INTEREST_RATE)} yearly interest`,
+  };
+}
+
 function withAllocation(holdings: Holding[]) {
   const totalValue = holdings.reduce((total, holding) => total + holding.currentValue, 0);
   return holdings
@@ -1277,13 +1323,18 @@ export default async function Home({
     fetchDubaiMetalPrices(),
   ]);
   const usdDisplayRate = currencyRates.get("USD") ?? 1;
+  const aedDisplayRate = currencyRates.get("AED") ?? 1;
   const portfolioHoldings = convertHoldings(aggregateLots(lots, quotes, cashBalance), usdDisplayRate);
   const commodityHoldings = convertTrackedPositions(
     buildTrackedPositions(commodityPositions, {}, metalPrices),
     displayCurrency,
     currencyRates,
   ).map(trackedCommodityToHolding);
-  const holdings = withAllocation([...portfolioHoldings, ...commodityHoldings]);
+  const holdings = withAllocation([
+    savingsHolding(aedDisplayRate),
+    ...portfolioHoldings,
+    ...commodityHoldings,
+  ]);
   const displayLots = convertLots(lots, usdDisplayRate);
   const performance = convertPerformance(buildPerformance(history, lots), usdDisplayRate);
 
