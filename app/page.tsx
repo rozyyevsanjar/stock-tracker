@@ -27,6 +27,7 @@ import type {
   Quote,
   ResearchNewsItem,
   ResearchProfile,
+  TrackerPosition,
   TrackedPosition,
   TransactionLot,
 } from "@/lib/types";
@@ -140,6 +141,10 @@ function LiveTicker({
 
         {holding.ticker === "CASH" ? (
           <p className="muted">Cash is tracked as uninvested account value.</p>
+        ) : holdingLots.length === 0 ? (
+          <p className="muted">
+            {holding.priceSource} for {formatShares(holding.shares)} units.
+          </p>
         ) : (
           <table className="compactTable">
             <thead>
@@ -961,6 +966,53 @@ function convertPerformance(points: PerformancePoint[], rate: number): Performan
   }));
 }
 
+function trackedCommodityToHolding(
+  position: TrackedPosition & {
+    costBasisDisplay: number;
+    currentPriceDisplay: number;
+    currentValueDisplay: number;
+    profitDisplay: number;
+  },
+): Holding {
+  return {
+    ticker: position.ticker,
+    company: position.asset,
+    shares: position.quantity,
+    buyPrice: position.quantity ? position.costBasisDisplay / position.quantity : 0,
+    invested: position.costBasisDisplay,
+    fees: 0,
+    lots: 1,
+    currentPrice: position.currentPriceDisplay,
+    previousPrice: position.currentPriceDisplay,
+    dailyChange: 0,
+    dailyChangePercent: 0,
+    currentValue: position.currentValueDisplay,
+    previousValue: position.currentValueDisplay,
+    valueDailyChange: 0,
+    profit: position.profitDisplay,
+    profitPercent: position.returnPercent,
+    allocationPercent: 0,
+    priceSource: position.marketSource,
+  };
+}
+
+function withAllocation(holdings: Holding[]) {
+  const totalValue = holdings.reduce((total, holding) => total + holding.currentValue, 0);
+  return holdings
+    .map((holding) => ({
+      ...holding,
+      allocationPercent: totalValue ? (holding.currentValue / totalValue) * 100 : 0,
+    }))
+    .sort((a, b) => b.currentValue - a.currentValue);
+}
+
+function trackerCommodityPositions(positions: TrackerPosition[]) {
+  return positions.filter((position) => {
+    const ticker = position.ticker.toUpperCase();
+    return position.assetType.toLowerCase() === "commodity" || ticker === "GOLD" || ticker === "SILVER";
+  });
+}
+
 function normalizeLotStatus(value: string | string[] | undefined): LotStatusFilter {
   const raw = oneParam(value);
   return raw === "open" || raw === "closed" ? raw : "all";
@@ -1208,19 +1260,30 @@ export default async function Home({
   }
 
   const displayCurrency = normalizeDisplayCurrency(params.currency);
-  const { cashBalance, lots } = await loadPortfolioStateFromTransactions();
+  const [{ cashBalance, lots }, trackerPositions] = await Promise.all([
+    loadPortfolioStateFromTransactions(),
+    loadTrackerPositions(),
+  ]);
+  const commodityPositions = trackerCommodityPositions(trackerPositions);
   const tickers = Array.from(new Set(lots.map((lot) => lot.ticker)));
   const firstPurchaseDate = lots
     .map((lot) => parsePurchaseDate(lot.purchaseDate))
     .filter((date): date is Date => Boolean(date))
     .sort((a, b) => a.getTime() - b.getTime())[0];
-  const [quotes, history, currencyRates] = await Promise.all([
+  const [quotes, history, currencyRates, metalPrices] = await Promise.all([
     fetchQuotes(tickers),
     fetchPriceHistory(tickers, timeframe, firstPurchaseDate),
     fetchCurrencyRates(displayCurrency),
+    fetchDubaiMetalPrices(),
   ]);
   const usdDisplayRate = currencyRates.get("USD") ?? 1;
-  const holdings = convertHoldings(aggregateLots(lots, quotes, cashBalance), usdDisplayRate);
+  const portfolioHoldings = convertHoldings(aggregateLots(lots, quotes, cashBalance), usdDisplayRate);
+  const commodityHoldings = convertTrackedPositions(
+    buildTrackedPositions(commodityPositions, {}, metalPrices),
+    displayCurrency,
+    currencyRates,
+  ).map(trackedCommodityToHolding);
+  const holdings = withAllocation([...portfolioHoldings, ...commodityHoldings]);
   const displayLots = convertLots(lots, usdDisplayRate);
   const performance = convertPerformance(buildPerformance(history, lots), usdDisplayRate);
 
