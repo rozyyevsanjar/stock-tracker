@@ -231,6 +231,59 @@ function AllocationTable({ holdings }: { holdings: Holding[] }) {
   );
 }
 
+function holdingCategory(holding: Holding) {
+  const ticker = holding.ticker.toUpperCase();
+  if (ticker === "SAVINGS") return "Savings";
+  if (ticker === "CASH") return "Cash";
+  if (ticker === "GOLD" || ticker === "SILVER") return "Metals";
+  if (ticker.includes("BTC") || ticker.includes("ETH") || ticker.endsWith("-USD")) return "Crypto";
+  return "Stocks";
+}
+
+function CategoryAllocationTable({
+  displayCurrency,
+  holdings,
+}: {
+  displayCurrency: DisplayCurrency;
+  holdings: Holding[];
+}) {
+  const totalValue = holdings.reduce((total, holding) => total + holding.currentValue, 0);
+  const categories = Array.from(
+    holdings.reduce((totals, holding) => {
+      const category = holdingCategory(holding);
+      totals.set(category, (totals.get(category) ?? 0) + holding.currentValue);
+      return totals;
+    }, new Map<string, number>()),
+  )
+    .map(([category, value]) => ({
+      category,
+      percent: totalValue ? (value / totalValue) * 100 : 0,
+      value,
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  return (
+    <section>
+      <h2>
+        Category allocation{" "}
+        <span className="help" title="How your current account value is split across asset categories.">?</span>
+      </h2>
+      <div className="allocationList">
+        {categories.map((item) => (
+          <div className="categoryAllocationRow" key={item.category}>
+            <span>{item.category}</span>
+            <div className="barTrack">
+              <div className="barFill" style={{ width: `${Math.min(item.percent, 100)}%` }} />
+            </div>
+            <strong>{formatPercent(item.percent)}</strong>
+            <em>{formatCurrency(item.value, displayCurrency)}</em>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function HoldingValueChart({
   displayCurrency,
   holdings,
@@ -1410,6 +1463,7 @@ export default async function Home({
       <div className="dashboardGrid">
         <HoldingValueChart displayCurrency={displayCurrency} holdings={holdings} />
         <AllocationTable holdings={holdings} />
+        <CategoryAllocationTable displayCurrency={displayCurrency} holdings={holdings} />
       </div>
     </main>
   );

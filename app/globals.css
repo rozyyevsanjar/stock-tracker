@@ -248,7 +248,7 @@ summary {
 }
 
 .dashboardGrid {
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 34px 0;
 }
 
@@ -1724,7 +1724,8 @@ section {
 }
 
 .holdingBarRow,
-.allocationRow {
+.allocationRow,
+.categoryAllocationRow {
   align-items: center;
   display: grid;
   gap: 12px;
@@ -1733,20 +1734,34 @@ section {
 }
 
 .holdingBarRow:hover,
-.allocationRow:hover {
+.allocationRow:hover,
+.categoryAllocationRow:hover {
   transform: translateX(4px);
 }
 
 .holdingBarRow span,
 .holdingBarRow a,
 .allocationRow span,
-.allocationRow a {
+.allocationRow a,
+.categoryAllocationRow span {
   font-weight: 650;
 }
 
 .holdingBarRow strong,
-.allocationRow strong {
+.allocationRow strong,
+.categoryAllocationRow strong,
+.categoryAllocationRow em {
   text-align: right;
+}
+
+.categoryAllocationRow {
+  grid-template-columns: 86px minmax(0, 1fr) 72px 104px;
+}
+
+.categoryAllocationRow em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 750;
 }
 
 .barTrack {
