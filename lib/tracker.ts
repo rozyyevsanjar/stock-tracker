@@ -2,10 +2,37 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Quote, TrackedPosition, TrackerPosition } from "./types";
 
+export type DisplayCurrency = "USD" | "EUR" | "AED";
+
+export const DISPLAY_CURRENCIES: DisplayCurrency[] = ["USD", "EUR", "AED"];
+
+type MetalPrice = {
+  price: number;
+  source: string;
+};
+
+type MetalPrices = Partial<Record<"GOLD" | "SILVER", MetalPrice>>;
+
+const headers = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+};
+
 function parseNumber(value: string | undefined) {
   if (value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function stripNumber(value: string | null | undefined) {
+  if (!value) return null;
+  return parseNumber(value.replace(/[^\d.-]/g, ""));
+}
+
+function metalKey(ticker: string): "GOLD" | "SILVER" | null {
+  if (ticker === "GOLD") return "GOLD";
+  if (ticker === "SILVER") return "SILVER";
+  return null;
 }
 
 function splitCsvLine(line: string) {
@@ -69,10 +96,13 @@ export async function loadTrackerPositions(): Promise<TrackerPosition[]> {
 export function buildTrackedPositions(
   positions: TrackerPosition[],
   quotes: Record<string, Quote>,
+  metalPrices: MetalPrices = {},
 ): TrackedPosition[] {
   return positions.map((position) => {
     const quote = position.marketTicker ? quotes[position.marketTicker] : undefined;
-    const livePrice = quote?.price ?? null;
+    const metal = metalKey(position.ticker);
+    const metalPrice = metal ? metalPrices[metal] : undefined;
+    const livePrice = metalPrice?.price ?? quote?.price ?? null;
     const currentPrice = livePrice ?? position.snapshotPrice ?? position.avgPrice;
     const currentValue = position.quantity * currentPrice;
     const costBasis = position.quantity * position.avgPrice;
@@ -90,10 +120,94 @@ export function buildTrackedPositions(
       currentValue,
       dailyChange: usingLivePrice && quote?.dailyChange ? quote.dailyChange * position.quantity : null,
       dailyChangePercent: usingLivePrice ? quote?.dailyChangePercent ?? null : null,
-      marketSource: usingLivePrice ? quote?.source ?? "Live quote" : "Workbook snapshot",
+      marketSource: metalPrice?.source ?? (usingLivePrice ? quote?.source ?? "Live quote" : "Workbook snapshot"),
       profit,
       returnPercent,
       usesLivePrice: usingLivePrice,
     };
   });
+}
+
+async function fetchYahooRate(from: string, to: string) {
+  if (from === to) return 1;
+
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${from}${to}=X?range=5d&interval=1d`,
+      { headers, next: { revalidate: 900 } },
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const closes: Array<number | null> =
+      data.chart?.result?.[0]?.indicators?.quote?.[0]?.close ?? [];
+    const rates = closes.filter((value): value is number => typeof value === "number");
+    return rates[rates.length - 1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCurrencyRates(displayCurrency: DisplayCurrency) {
+  const currencies: DisplayCurrency[] = ["USD", "EUR", "AED"];
+  const rates = new Map<string, number>();
+  rates.set(displayCurrency, 1);
+
+  await Promise.all(
+    currencies
+      .filter((currency) => currency !== displayCurrency)
+      .map(async (currency) => {
+        const directRate = await fetchYahooRate(currency, displayCurrency);
+        if (directRate) {
+          rates.set(currency, directRate);
+          return;
+        }
+
+        const toUsd = await fetchYahooRate(currency, "USD");
+        const usdToDisplay = await fetchYahooRate("USD", displayCurrency);
+        rates.set(currency, toUsd && usdToDisplay ? toUsd * usdToDisplay : 1);
+      }),
+  );
+
+  return rates;
+}
+
+export function convertTrackedPositions(
+  positions: TrackedPosition[],
+  displayCurrency: DisplayCurrency,
+  rates: Map<string, number>,
+) {
+  return positions.map((position) => {
+    const currency = position.priceCurrency || position.valueCurrency || "USD";
+    const rate = rates.get(currency) ?? 1;
+    return {
+      ...position,
+      costBasisDisplay: position.costBasis * rate,
+      currentPriceDisplay: position.currentPrice * rate,
+      currentValueDisplay: position.currentValue * rate,
+      displayCurrency,
+      profitDisplay: position.profit * rate,
+      sourceCurrency: currency,
+    };
+  });
+}
+
+export async function fetchDubaiMetalPrices(): Promise<MetalPrices> {
+  try {
+    const response = await fetch("https://mintjewels.ae/live-gold-price-dubai/", {
+      headers,
+      next: { revalidate: 900 },
+    });
+    if (!response.ok) return {};
+    const html = await response.text();
+    const gold = stripNumber(/Gold 24K[\s\S]{0,120}?AED\s*([\d,.]+)/i.exec(html)?.[1]);
+    const silver = stripNumber(/Silver 999[\s\S]{0,120}?AED\s*([\d,.]+)/i.exec(html)?.[1]);
+    const source = "Dubai live metal rate";
+
+    return {
+      ...(gold ? { GOLD: { price: gold, source } } : {}),
+      ...(silver ? { SILVER: { price: silver, source } } : {}),
+    };
+  } catch {
+    return {};
+  }
 }

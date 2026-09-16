@@ -9,7 +9,15 @@ import {
 } from "@/lib/market";
 import { formatCurrency, formatMoney, formatPercent, formatShares, signed } from "@/lib/format";
 import { buildTransactionLots, cashImpact, loadTransactions } from "@/lib/transactions";
-import { buildTrackedPositions, loadTrackerPositions } from "@/lib/tracker";
+import {
+  DISPLAY_CURRENCIES,
+  type DisplayCurrency,
+  buildTrackedPositions,
+  convertTrackedPositions,
+  fetchCurrencyRates,
+  fetchDubaiMetalPrices,
+  loadTrackerPositions,
+} from "@/lib/tracker";
 import { assetLogoFallback, assetLogoUrl } from "@/lib/logos";
 import type {
   Holding,
@@ -459,34 +467,60 @@ function TrackerTicker({ position }: { position: TrackedPosition }) {
   );
 }
 
-function currencyTotals(positions: TrackedPosition[], selector: (position: TrackedPosition) => number) {
-  const totals = new Map<string, number>();
-  for (const position of positions) {
-    const currency = position.priceCurrency || position.valueCurrency || "USD";
-    totals.set(currency, (totals.get(currency) ?? 0) + selector(position));
-  }
-  return Array.from(totals.entries()).sort(([a], [b]) => a.localeCompare(b));
+function CurrencySelector({ activeCurrency }: { activeCurrency: DisplayCurrency }) {
+  return (
+    <nav className="currencyNav" aria-label="Tracker display currency">
+      {DISPLAY_CURRENCIES.map((currency) => (
+        <a
+          aria-current={activeCurrency === currency ? "page" : undefined}
+          className={activeCurrency === currency ? "active" : ""}
+          href={`/?tab=tracker&currency=${currency}`}
+          key={currency}
+        >
+          {currency}
+        </a>
+      ))}
+    </nav>
+  );
 }
 
-function formatCurrencyList(totals: Array<[string, number]>) {
-  if (!totals.length) return "-";
-  return totals.map(([currency, value]) => formatCurrency(value, currency)).join(" / ");
-}
-
-function TrackerView({ positions }: { positions: TrackedPosition[] }) {
+function TrackerView({
+  displayCurrency,
+  positions,
+}: {
+  displayCurrency: DisplayCurrency;
+  positions: Array<TrackedPosition & {
+    costBasisDisplay: number;
+    currentPriceDisplay: number;
+    currentValueDisplay: number;
+    displayCurrency: DisplayCurrency;
+    profitDisplay: number;
+    sourceCurrency: string;
+  }>;
+}) {
   const liveCount = positions.filter((position) => position.usesLivePrice).length;
-  const valueTotals = currencyTotals(positions, (position) => position.currentValue);
-  const profitTotals = currencyTotals(positions, (position) => position.profit);
+  const totalCost = positions.reduce((total, position) => total + position.costBasisDisplay, 0);
+  const totalValue = positions.reduce((total, position) => total + position.currentValueDisplay, 0);
+  const totalProfit = positions.reduce((total, position) => total + position.profitDisplay, 0);
+  const totalReturn = totalCost ? (totalProfit / totalCost) * 100 : 0;
   const platformTotals = Array.from(
     positions.reduce((totals, position) => {
-      const key = `${position.platform || "Other"}|${position.priceCurrency || position.valueCurrency || "USD"}`;
-      totals.set(key, (totals.get(key) ?? 0) + position.currentValue);
+      const key = position.platform || "Other";
+      totals.set(key, (totals.get(key) ?? 0) + position.currentValueDisplay);
       return totals;
     }, new Map<string, number>()),
   ).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <>
+      <div className="trackerControls">
+        <div>
+          <h2>Display currency</h2>
+          <p className="sectionNote">All tracker values are converted using live FX rates.</p>
+        </div>
+        <CurrencySelector activeCurrency={displayCurrency} />
+      </div>
+
       <section className="metricsGrid">
         <MetricCard
           label="Tracked assets"
@@ -496,14 +530,16 @@ function TrackerView({ positions }: { positions: TrackedPosition[] }) {
         />
         <MetricCard
           label="Current value"
-          value={formatCurrencyList(valueTotals)}
-          help="Current market value grouped by currency. Currencies are not converted or mixed."
+          value={formatCurrency(totalValue, displayCurrency)}
+          help="Current market value converted into the selected display currency."
         />
         <MetricCard
           label="Profit / loss"
-          value={formatCurrencyList(profitTotals)}
-          valueTone={tone(profitTotals.reduce((total, [, value]) => total + value, 0))}
-          help="Unrealized P/L grouped by currency, using live prices where available."
+          value={formatCurrency(totalProfit, displayCurrency)}
+          valueTone={tone(totalProfit)}
+          delta={`${formatPercent(totalReturn)} total return`}
+          deltaValue={totalProfit}
+          help="Unrealized P/L converted into the selected display currency."
         />
         <MetricCard
           label="Price source"
@@ -517,8 +553,7 @@ function TrackerView({ positions }: { positions: TrackedPosition[] }) {
           <div>
             <h2>Tracked positions</h2>
             <p className="sectionNote">
-              Live market prices are used when a market ticker is available. Gold and silver currently use
-              the workbook snapshot.
+              Stocks and crypto use market quotes. Gold and silver use live Dubai AED-per-gram rates.
             </p>
           </div>
           <span className="statusPill">XLSX import</span>
@@ -541,7 +576,6 @@ function TrackerView({ positions }: { positions: TrackedPosition[] }) {
             </thead>
             <tbody>
               {positions.map((position) => {
-                const currency = position.priceCurrency || position.valueCurrency || "USD";
                 return (
                   <tr key={`${position.platform}-${position.asset}-${position.quantity}`}>
                     <td>
@@ -551,10 +585,10 @@ function TrackerView({ positions }: { positions: TrackedPosition[] }) {
                       <span className="typePill split">{position.platform || "Other"}</span>
                     </td>
                     <td>{formatShares(position.quantity)} {position.unit}</td>
-                    <td>{formatCurrency(position.avgPrice, currency)}</td>
-                    <td>{formatCurrency(position.currentPrice, currency)}</td>
-                    <td>{formatCurrency(position.currentValue, currency)}</td>
-                    <td className={tone(position.profit)}>{formatCurrency(position.profit, currency)}</td>
+                    <td>{formatCurrency(position.avgPrice, position.sourceCurrency)}</td>
+                    <td>{formatCurrency(position.currentPriceDisplay, displayCurrency)}</td>
+                    <td>{formatCurrency(position.currentValueDisplay, displayCurrency)}</td>
+                    <td className={tone(position.profitDisplay)}>{formatCurrency(position.profitDisplay, displayCurrency)}</td>
                     <td className={tone(position.returnPercent)}>{formatPercent(position.returnPercent)}</td>
                     <td>
                       <span className={`sourceBadge ${position.usesLivePrice ? "live" : ""}`}>
@@ -573,11 +607,10 @@ function TrackerView({ positions }: { positions: TrackedPosition[] }) {
         <h2>Platform value</h2>
         <div className="trackerPlatformList">
           {platformTotals.map(([key, value]) => {
-            const [platform, currency] = key.split("|");
             return (
               <div className="trackerPlatformRow" key={key}>
-                <span>{platform}</span>
-                <strong>{formatCurrency(value, currency)}</strong>
+                <span>{key}</span>
+                <strong>{formatCurrency(value, displayCurrency)}</strong>
               </div>
             );
           })}
@@ -846,6 +879,11 @@ function oneParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function normalizeDisplayCurrency(value: string | string[] | undefined): DisplayCurrency {
+  const raw = String(oneParam(value) ?? "USD").toUpperCase();
+  return raw === "EUR" || raw === "AED" ? raw : "USD";
+}
+
 function normalizeLotStatus(value: string | string[] | undefined): LotStatusFilter {
   const raw = oneParam(value);
   return raw === "open" || raw === "closed" ? raw : "all";
@@ -1035,12 +1073,21 @@ export default async function Home({
   }
 
   if (activeTab === "tracker") {
+    const displayCurrency = normalizeDisplayCurrency(params.currency);
     const trackerPositions = await loadTrackerPositions();
     const marketTickers = trackerPositions
       .map((position) => position.marketTicker)
       .filter(Boolean);
-    const quotes = await fetchQuotes(marketTickers);
-    const trackedPositions = buildTrackedPositions(trackerPositions, quotes);
+    const [quotes, metalPrices, currencyRates] = await Promise.all([
+      fetchQuotes(marketTickers),
+      fetchDubaiMetalPrices(),
+      fetchCurrencyRates(displayCurrency),
+    ]);
+    const trackedPositions = convertTrackedPositions(
+      buildTrackedPositions(trackerPositions, quotes, metalPrices),
+      displayCurrency,
+      currencyRates,
+    );
 
     return (
       <main>
@@ -1050,9 +1097,9 @@ export default async function Home({
             <h1>Tracker</h1>
             <p>Current positions from your investment workbook, checked against market prices.</p>
           </div>
-          <span className="statusPill">Live + snapshot</span>
+          <span className="statusPill">Default USD</span>
         </header>
-        <TrackerView positions={trackedPositions} />
+        <TrackerView displayCurrency={displayCurrency} positions={trackedPositions} />
       </main>
     );
   }

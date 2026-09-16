@@ -515,6 +515,55 @@ section {
   text-align: left;
 }
 
+.trackerControls {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 18px;
+}
+
+.trackerControls h2 {
+  margin: 0 0 4px;
+}
+
+.currencyNav {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.currencyNav a {
+  border-radius: 6px;
+  color: var(--muted);
+  font-weight: 800;
+  min-width: 54px;
+  padding: 9px 12px;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    background-color var(--motion),
+    color var(--motion),
+    transform var(--motion);
+}
+
+.currencyNav a:hover {
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.currencyNav a.active {
+  background: var(--blue);
+  color: var(--accent-contrast);
+}
+
 .trackerTableWrap {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2007,6 +2056,19 @@ svg:hover .investedLine {
 
   .sectionHeader {
     flex-direction: column;
+  }
+
+  .trackerControls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .currencyNav {
+    width: 100%;
+  }
+
+  .currencyNav a {
+    flex: 1;
   }
 
   .lotItem summary,
