@@ -1,6 +1,8 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type ChatMessage = {
   role: "assistant" | "user";
@@ -386,7 +388,14 @@ export function AssistantChat() {
             {messages.map((message, index) => (
               <div className={`assistantMessage ${message.role}`} key={`${message.role}-${index}`}>
                 <span>{message.role === "user" ? "You" : "Assistant"}</span>
-                <p>{message.text}</p>
+                {message.role === "assistant" ? (
+                  <div className="assistantMarkdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{
+                      a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
+                      table: ({ children }) => <div className="assistantTableScroll"><table>{children}</table></div>,
+                    }}>{message.text}</ReactMarkdown>
+                  </div>
+                ) : <p>{message.text}</p>}
               </div>
             ))}
             {isSending ? (

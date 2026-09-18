@@ -531,7 +531,7 @@ summary {
   border-color: color-mix(in srgb, var(--line), var(--blue) 38%);
 }
 
-.assistantMessage span {
+.assistantMessage > span {
   color: var(--muted);
   display: block;
   font-size: 0.78rem;
@@ -544,6 +544,35 @@ summary {
   margin: 0;
   white-space: pre-wrap;
 }
+
+.assistantMarkdown {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.assistantMarkdown p { white-space: normal; }
+.assistantMarkdown > * { margin: 0 0 12px; }
+.assistantMarkdown > :last-child { margin-bottom: 0; }
+.assistantMarkdown h1,
+.assistantMarkdown h2,
+.assistantMarkdown h3,
+.assistantMarkdown h4 { font-size: 1rem; line-height: 1.4; margin-top: 16px; }
+.assistantMarkdown > :first-child { margin-top: 0; }
+.assistantMarkdown ul,
+.assistantMarkdown ol { padding-left: 22px; }
+.assistantMarkdown li { margin: 4px 0; }
+.assistantMarkdown strong { font-weight: 750; }
+.assistantMarkdown a { color: var(--blue); text-decoration: underline; }
+.assistantMarkdown blockquote { border-left: 3px solid var(--blue); padding-left: 12px; color: var(--muted); }
+.assistantMarkdown pre { overflow-x: auto; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.assistantMarkdown code { font-size: 0.85em; }
+.assistantMarkdown hr { border: 0; border-top: 1px solid var(--line); }
+.assistantTableScroll { max-width: 100%; overflow-x: auto; }
+.assistantMarkdown table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.assistantMarkdown th,
+.assistantMarkdown td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+.assistantMarkdown img { max-width: 100%; height: auto; }
 
 .assistantComposer {
   align-items: stretch;
