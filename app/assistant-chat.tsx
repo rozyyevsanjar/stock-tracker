@@ -15,6 +15,25 @@ type SavedChat = {
   updatedAt: string;
 };
 
+type UsageSummary = {
+  lastRequestAt: string | null;
+  lastSevenDays: {
+    requests: number;
+    tokens: number;
+  };
+  models: Array<{
+    model: string;
+    requests: number;
+    tokens: number;
+  }>;
+  today: {
+    inputTokens: number;
+    outputTokens: number;
+    requests: number;
+    tokens: number;
+  };
+};
+
 const STARTER_PROMPTS = [
   "Summarize my current portfolio allocation.",
   "What is my biggest concentration risk?",
@@ -39,6 +58,18 @@ function getClientId() {
   return existing;
 }
 
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatUsageDate(value: string | null) {
+  if (!value) return "No requests yet";
+  return new Date(value).toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 export function AssistantChat() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [chats, setChats] = useState<SavedChat[]>([]);
@@ -48,6 +79,8 @@ export function AssistantChat() {
   const [historyStatus, setHistoryStatus] = useState("Loading saved chats...");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [usageStatus, setUsageStatus] = useState("Loading usage...");
 
   const canSend = useMemo(() => input.trim().length > 0 && !isSending, [input, isSending]);
   const historyHeaders = useMemo(
@@ -60,6 +93,26 @@ export function AssistantChat() {
 
   useEffect(() => {
     setClientId(getClientId());
+  }, []);
+
+  async function refreshUsage() {
+    try {
+      const response = await fetch("/api/assistant-usage");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Gemini usage is unavailable.");
+      }
+
+      setUsage(data.usage ?? null);
+      setUsageStatus("Usage tracked from this dashboard.");
+    } catch (err) {
+      setUsageStatus(err instanceof Error ? err.message : "Gemini usage is unavailable.");
+    }
+  }
+
+  useEffect(() => {
+    void refreshUsage();
   }, []);
 
   useEffect(() => {
@@ -158,6 +211,7 @@ export function AssistantChat() {
 
       const answeredMessages = [...nextMessages, { role: "assistant" as const, text: data.answer }];
       setMessages(answeredMessages);
+      void refreshUsage();
       try {
         await saveChat(answeredMessages);
       } catch (saveError) {
@@ -236,6 +290,45 @@ export function AssistantChat() {
             Delete
           </button>
         </div>
+      </div>
+
+      <div className="assistantUsageCard">
+        <div className="assistantUsageHeader">
+          <div>
+            <strong>Gemini usage</strong>
+            <span>{usageStatus}</span>
+          </div>
+          <a href="https://aistudio.google.com/rate-limit" rel="noreferrer" target="_blank">
+            AI Studio limits
+          </a>
+        </div>
+        <div className="assistantUsageGrid">
+          <div>
+            <span>Today</span>
+            <strong>{formatNumber(usage?.today.requests ?? 0)} requests</strong>
+          </div>
+          <div>
+            <span>Tokens today</span>
+            <strong>{formatNumber(usage?.today.tokens ?? 0)}</strong>
+          </div>
+          <div>
+            <span>7 days</span>
+            <strong>{formatNumber(usage?.lastSevenDays.requests ?? 0)} requests</strong>
+          </div>
+          <div>
+            <span>Last request</span>
+            <strong>{formatUsageDate(usage?.lastRequestAt ?? null)}</strong>
+          </div>
+        </div>
+        {usage?.models.length ? (
+          <div className="assistantUsageModels">
+            {usage.models.map((model) => (
+              <span key={model.model}>
+                {model.model}: {formatNumber(model.requests)} / {formatNumber(model.tokens)} tokens
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {chats.length ? (

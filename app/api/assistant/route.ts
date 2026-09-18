@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordGeminiUsage } from "@/lib/assistant-usage";
 import { buildTransactionLots, loadTransactions } from "@/lib/transactions";
 import { loadTrackerPositions } from "@/lib/tracker";
 
@@ -153,6 +154,19 @@ function finishReason(data: Record<string, unknown>) {
   return String(candidates?.[0]?.finishReason ?? "");
 }
 
+function usageMetadata(data: Record<string, unknown>) {
+  const usage = data.usageMetadata as Record<string, unknown> | undefined;
+  const inputTokens = Number(usage?.promptTokenCount ?? 0);
+  const outputTokens = Number(usage?.candidatesTokenCount ?? 0);
+  const totalTokens = Number(usage?.totalTokenCount ?? inputTokens + outputTokens);
+
+  return {
+    inputTokens: Number.isFinite(inputTokens) ? inputTokens : 0,
+    outputTokens: Number.isFinite(outputTokens) ? outputTokens : 0,
+    totalTokens: Number.isFinite(totalTokens) ? totalTokens : 0,
+  };
+}
+
 function errorMessage(data: unknown) {
   return (data as { error?: { message?: string } }).error?.message ?? "";
 }
@@ -220,7 +234,7 @@ async function askGemini({
         ? "\n\nNote: I hit the response limit. Ask me to continue and I can pick up from here."
         : "";
 
-    return { answer: `${answer}${suffix}`, model };
+    return { answer: `${answer}${suffix}`, model, usage: usageMetadata(data as Record<string, unknown>) };
   }
 
   return {
@@ -250,6 +264,13 @@ export async function POST(request: Request) {
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await recordGeminiUsage({
+    inputTokens: result.usage.inputTokens,
+    model: result.model,
+    outputTokens: result.usage.outputTokens,
+    totalTokens: result.usage.totalTokens,
+  });
 
   return NextResponse.json({ answer: result.answer, model: result.model });
 }

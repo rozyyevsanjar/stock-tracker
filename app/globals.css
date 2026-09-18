@@ -229,6 +229,70 @@ summary {
   font-style: normal;
 }
 
+.assistantUsageCard {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.assistantUsageHeader {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.assistantUsageHeader strong,
+.assistantUsageGrid strong {
+  display: block;
+}
+
+.assistantUsageHeader span,
+.assistantUsageGrid span,
+.assistantUsageModels {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.assistantUsageHeader a {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.assistantUsageGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.assistantUsageGrid div {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.assistantUsageModels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assistantUsageModels span {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 9px;
+}
+
 .assistantHistoryActions,
 .assistantSavedChats {
   display: flex;
@@ -2261,6 +2325,7 @@ svg:hover .investedLine {
   .transactionEdit form,
   .openLotForm,
   .lotFilterForm,
+  .assistantUsageGrid,
   .watchlistItem,
   .researchSearch > div {
     grid-template-columns: 1fr;
