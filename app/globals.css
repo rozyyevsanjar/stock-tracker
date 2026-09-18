@@ -222,6 +222,42 @@ summary {
   gap: 10px;
 }
 
+.assistantUsageCompact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+}
+
+.assistantUsageCompact span {
+  color: var(--muted);
+}
+
+.assistantUsageCompact strong {
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.assistantUsageCompact progress {
+  appearance: none;
+  border: 0;
+  border-radius: 4px;
+  height: 4px;
+  width: 100px;
+  min-width: 24px;
+  flex-shrink: 1;
+  overflow: hidden;
+  background: var(--line);
+  color: var(--blue);
+}
+
+.assistantUsageCompact progress::-webkit-progress-bar { background: var(--line); }
+.assistantUsageCompact progress::-webkit-progress-value { background: var(--blue); }
+.assistantUsageCompact progress::-moz-progress-bar { background: var(--blue); }
+
 .assistantUsageCard {
   background: var(--panel-gradient-strong);
   border: 1px solid var(--line);

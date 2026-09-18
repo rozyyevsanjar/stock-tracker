@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 type ChatMessage = {
   role: "assistant" | "user";
@@ -59,10 +59,6 @@ function getClientId() {
   return existing;
 }
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
 function percentage(value: number, limit: number) {
   if (!limit) return 0;
   return Math.min((value / limit) * 100, 100);
@@ -70,14 +66,6 @@ function percentage(value: number, limit: number) {
 
 function formatPercent(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
-}
-
-function formatUsageDate(value: string | null) {
-  if (!value) return "No requests yet";
-  return new Date(value).toLocaleString([], {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
 }
 
 export function AssistantChat() {
@@ -93,6 +81,10 @@ export function AssistantChat() {
   const [editingTitle, setEditingTitle] = useState("");
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [usageStatus, setUsageStatus] = useState("Loading usage...");
+  const combinedUsage = usage ? percentage(
+    usage.quotas.reduce((sum, quota) => sum + quota.requests, 0),
+    usage.quotas.reduce((sum, quota) => sum + quota.rpd, 0),
+  ) : null;
 
   const canSend = useMemo(() => input.trim().length > 0 && !isSending, [input, isSending]);
   const historyHeaders = useMemo(
@@ -321,55 +313,10 @@ export function AssistantChat() {
         <span className="statusPill">Gemini</span>
       </div>
 
-      <div className="assistantUsageCard">
-        <div className="assistantUsageHeader">
-          <div>
-            <strong>Gemini usage</strong>
-            <span>{usageStatus}</span>
-          </div>
-          <a href="https://aistudio.google.com/rate-limit" rel="noreferrer" target="_blank">
-            AI Studio limits
-          </a>
-        </div>
-        <div className="assistantUsageGrid">
-          <div>
-            <span>Today</span>
-            <strong>{formatNumber(usage?.today.requests ?? 0)} requests</strong>
-          </div>
-          <div>
-            <span>Tokens today</span>
-            <strong>{formatNumber(usage?.today.tokens ?? 0)}</strong>
-          </div>
-          <div>
-            <span>7 days</span>
-            <strong>{formatNumber(usage?.lastSevenDays.requests ?? 0)} requests</strong>
-          </div>
-          <div>
-            <span>Last request</span>
-            <strong>{formatUsageDate(usage?.lastRequestAt ?? null)}</strong>
-          </div>
-        </div>
-        <div className="assistantUsageGrid">
-          {usage?.quotas.map((quota) => (
-            <div key={quota.model}>
-              <span>{quota.model}</span>
-              <strong>{quota.requests} / {quota.rpd} today · {formatPercent(percentage(quota.requests, quota.rpd))}</strong>
-              <em>{quota.minuteRequests} / {quota.rpm} requests per minute</em>
-              <em>{formatNumber(quota.minuteTokens)} / {formatNumber(quota.tpm)} input token budget per minute · {formatPercent(percentage(quota.minuteTokens, quota.tpm))}</em>
-              {quota.blocked ? <em>Google quota cooldown</em> : null}
-              <i style={{ "--usage-percent": `${percentage(quota.requests, quota.rpd)}%` } as CSSProperties} />
-            </div>
-          ))}
-        </div>
-        {usage?.models.length ? (
-          <div className="assistantUsageModels">
-            {usage.models.map((model) => (
-              <span key={model.model}>
-                {model.model}: {formatNumber(model.requests)} / {formatNumber(model.tokens)} tokens
-              </span>
-            ))}
-          </div>
-        ) : null}
+      <div className="assistantUsageCompact" title={combinedUsage === null ? usageStatus : "Combined daily request allowance used by this dashboard. Resets at midnight Pacific. Individual model limits still apply."}>
+        <span>Gemini usage today</span>
+        <progress aria-label="Combined daily Gemini request usage" max={100} value={combinedUsage ?? 0} />
+        <strong aria-live="polite">{combinedUsage === null ? (usageStatus === "Loading usage..." ? "Loading…" : "Unavailable") : formatPercent(combinedUsage)}</strong>
       </div>
 
       <div className="assistantWorkspace">
