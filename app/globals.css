@@ -13,6 +13,14 @@
   --accent-contrast: #07111f;
   --shadow: 0 16px 34px rgb(0 0 0 / 22%);
   --shadow-strong: 0 18px 36px rgb(0 0 0 / 28%);
+  --panel-gradient:
+    linear-gradient(145deg, color-mix(in srgb, var(--panel-2), var(--blue) 9%), var(--panel) 72%),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--blue), transparent 84%), transparent 24rem);
+  --panel-gradient-strong:
+    linear-gradient(150deg, color-mix(in srgb, var(--panel-2), var(--blue) 13%), color-mix(in srgb, var(--panel), var(--green) 4%) 78%),
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--blue), transparent 76%), transparent 22rem);
+  --tile-gradient:
+    linear-gradient(150deg, color-mix(in srgb, var(--panel), var(--text) 3%), color-mix(in srgb, var(--panel-2), var(--blue) 5%));
   --chart-glow: drop-shadow(0 0 8px rgb(77 171 247 / 34%));
   --focus-fill: rgb(77 171 247 / 18%);
   --motion: 180ms ease;
@@ -34,6 +42,14 @@
   --accent-contrast: #ffffff;
   --shadow: 0 16px 32px rgb(31 45 61 / 10%);
   --shadow-strong: 0 18px 42px rgb(31 45 61 / 14%);
+  --panel-gradient:
+    linear-gradient(145deg, color-mix(in srgb, var(--panel-2), var(--blue) 7%), var(--panel) 72%),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--blue), transparent 88%), transparent 24rem);
+  --panel-gradient-strong:
+    linear-gradient(150deg, color-mix(in srgb, var(--panel), var(--blue) 8%), color-mix(in srgb, var(--panel-2), var(--green) 5%) 78%),
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--blue), transparent 84%), transparent 22rem);
+  --tile-gradient:
+    linear-gradient(150deg, var(--panel), color-mix(in srgb, var(--panel-2), var(--blue) 6%));
   --chart-glow: drop-shadow(0 0 8px rgb(29 111 215 / 24%));
   --focus-fill: rgb(29 111 215 / 13%);
   color-scheme: light;
@@ -207,9 +223,10 @@ summary {
 }
 
 .assistantUsageCard {
-  background: var(--panel-2);
+  background: var(--panel-gradient-strong);
   border: 1px solid var(--line);
   border-radius: 8px;
+  box-shadow: var(--shadow);
   display: grid;
   gap: 12px;
   padding: 12px;
@@ -235,7 +252,8 @@ summary {
 }
 
 .assistantUsageHeader a {
-  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel), transparent 16%);
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 22%);
   border-radius: 8px;
   color: var(--text);
   font-size: 0.84rem;
@@ -251,8 +269,8 @@ summary {
 }
 
 .assistantUsageGrid div {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--tile-gradient);
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 16%);
   border-radius: 8px;
   padding: 10px;
 }
@@ -285,8 +303,8 @@ summary {
 }
 
 .assistantUsageModels span {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel), transparent 12%);
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 16%);
   border-radius: 999px;
   padding: 6px 9px;
 }
@@ -304,9 +322,10 @@ summary {
 }
 
 .assistantSidebar {
-  background: var(--panel-2);
+  background: var(--panel-gradient);
   border: 1px solid var(--line);
   border-radius: 8px;
+  box-shadow: var(--shadow);
   display: grid;
   gap: 12px;
   max-height: 720px;
@@ -347,8 +366,8 @@ summary {
 .assistantSidebarHeader button,
 .assistantChatActions button,
 .assistantRenameForm button {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel), transparent 12%);
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 16%);
   border-radius: 8px;
   color: var(--text);
   cursor: pointer;
@@ -365,8 +384,8 @@ summary {
 }
 
 .assistantSavedChats article {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--tile-gradient);
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 12%);
   border-radius: 8px;
   display: grid;
   gap: 8px;
@@ -406,8 +425,8 @@ summary {
 }
 
 .assistantRenameForm input {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel), transparent 8%);
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 20%);
   border-radius: 8px;
   color: var(--text);
   font: inherit;
@@ -435,7 +454,8 @@ summary {
 }
 
 .assistantStarters button {
-  background: var(--panel-2);
+  background: var(--tile-gradient);
+  border-color: color-mix(in srgb, var(--line), var(--blue) 16%);
   color: var(--text);
 }
 
@@ -462,14 +482,17 @@ summary {
 }
 
 .assistantMessage {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--panel-gradient);
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 12%);
   border-radius: 8px;
   padding: 14px;
 }
 
 .assistantMessage.user {
-  background: color-mix(in srgb, var(--blue), transparent 88%);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--blue), transparent 82%), color-mix(in srgb, var(--panel), var(--blue) 9%)),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--green), transparent 90%), transparent 18rem);
+  border-color: color-mix(in srgb, var(--line), var(--blue) 38%);
 }
 
 .assistantMessage span {
@@ -494,8 +517,8 @@ summary {
 }
 
 .assistantComposer textarea {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--panel-gradient);
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 16%);
   border-radius: 8px;
   color: var(--text);
   font: inherit;
