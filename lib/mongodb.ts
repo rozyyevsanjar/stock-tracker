@@ -12,7 +12,9 @@ export async function getMongoClient() {
 
   if (cachedClient) return cachedClient;
   if (!cachedPromise) {
-    cachedPromise = new MongoClient(uri).connect();
+    cachedPromise = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 3000,
+    }).connect();
   }
 
   cachedClient = await cachedPromise;
