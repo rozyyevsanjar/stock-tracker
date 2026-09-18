@@ -206,29 +206,6 @@ summary {
   gap: 10px;
 }
 
-.assistantHistoryBar {
-  align-items: center;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  display: flex;
-  gap: 14px;
-  justify-content: space-between;
-  padding: 12px;
-}
-
-.assistantHistoryBar strong,
-.assistantSavedChats span {
-  display: block;
-}
-
-.assistantHistoryBar span,
-.assistantSavedChats em {
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-style: normal;
-}
-
 .assistantUsageCard {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -314,38 +291,133 @@ summary {
   padding: 6px 9px;
 }
 
-.assistantHistoryActions,
-.assistantSavedChats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.assistantWorkspace {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
 }
 
-.assistantHistoryActions button,
-.assistantSavedChats button {
+.assistantSidebar,
+.assistantConversation {
+  min-width: 0;
+}
+
+.assistantSidebar {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  max-height: 720px;
+  overflow: hidden;
+  padding: 12px;
+  position: sticky;
+  top: 14px;
+}
+
+.assistantSidebarHeader {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.assistantSidebarHeader strong,
+.assistantSavedChats span {
+  display: block;
+}
+
+.assistantSidebarHeader span,
+.assistantSavedChats em,
+.assistantEmptyChats {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: normal;
+}
+
+.assistantSidebarHeader button,
+.assistantChatActions button,
+.assistantRenameForm button,
+.assistantSavedChats article,
+.assistantChatOpen {
+  font: inherit;
+}
+
+.assistantSidebarHeader button,
+.assistantChatActions button,
+.assistantRenameForm button {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--text);
   cursor: pointer;
-  font: inherit;
   font-weight: 750;
   padding: 9px 11px;
 }
 
-.assistantHistoryActions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
+.assistantSavedChats {
+  display: grid;
+  gap: 10px;
+  max-height: 620px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
-.assistantSavedChats button {
-  max-width: 240px;
+.assistantSavedChats article {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.assistantSavedChats article.active {
+  border-color: color-mix(in srgb, var(--blue), var(--line) 35%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue), transparent 35%);
+}
+
+.assistantChatOpen {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
   text-align: left;
 }
 
-.assistantSavedChats button.active {
-  border-color: color-mix(in srgb, var(--blue), var(--line) 35%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue), transparent 35%);
+.assistantChatActions,
+.assistantRenameForm div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assistantChatActions button,
+.assistantRenameForm button {
+  font-size: 0.78rem;
+  padding: 7px 8px;
+}
+
+.assistantRenameForm {
+  display: grid;
+  gap: 8px;
+}
+
+.assistantRenameForm input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  padding: 9px 10px;
+  width: 100%;
+}
+
+.assistantConversation {
+  display: grid;
+  gap: 12px;
 }
 
 .assistantStarters button,
@@ -2347,9 +2419,19 @@ svg:hover .investedLine {
   .openLotForm,
   .lotFilterForm,
   .assistantUsageGrid,
+  .assistantWorkspace,
   .watchlistItem,
   .researchSearch > div {
     grid-template-columns: 1fr;
+  }
+
+  .assistantSidebar {
+    max-height: none;
+    position: static;
+  }
+
+  .assistantSavedChats {
+    max-height: 320px;
   }
 
   .watchlistItem a {

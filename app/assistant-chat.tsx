@@ -92,6 +92,8 @@ export function AssistantChat() {
   const [historyStatus, setHistoryStatus] = useState("Loading saved chats...");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [usageStatus, setUsageStatus] = useState("Loading usage...");
 
@@ -195,7 +197,6 @@ export function AssistantChat() {
           ? {
               ...chat,
               messages: nextMessages,
-              title: nextMessages.find((message) => message.role === "user")?.text.slice(0, 54) || chat.title,
               updatedAt: new Date().toISOString(),
             }
           : chat,
@@ -259,17 +260,48 @@ export function AssistantChat() {
   function openChat(chat: SavedChat) {
     setActiveChatId(chat.id);
     setMessages(chat.messages.length ? chat.messages : EMPTY_MESSAGES);
+    setEditingChatId(null);
     setInput("");
     setError("");
   }
 
-  async function deleteActiveChat() {
-    if (!activeChatId || !clientId) return;
+  function beginRename(chat: SavedChat) {
+    setEditingChatId(chat.id);
+    setEditingTitle(chat.title);
+  }
 
-    const idToDelete = activeChatId;
-    setActiveChatId(null);
-    setMessages(EMPTY_MESSAGES);
+  async function renameChat(id: string) {
+    const title = editingTitle.trim();
+    if (!title) return;
+    try {
+      const response = await fetch(`/api/assistant-chats/${id}`, {
+        body: JSON.stringify({ title }),
+        headers: historyHeaders,
+        method: "PATCH",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not rename chat.");
+
+      setChats((current) =>
+        current.map((chat) =>
+          chat.id === id ? { ...chat, title, updatedAt: new Date().toISOString() } : chat,
+        ),
+      );
+      setEditingChatId(null);
+      setHistoryStatus("Renamed.");
+    } catch (err) {
+      setHistoryStatus(err instanceof Error ? err.message : "Could not rename chat.");
+    }
+  }
+
+  async function deleteChat(idToDelete: string) {
     setChats((current) => current.filter((chat) => chat.id !== idToDelete));
+    if (activeChatId === idToDelete) {
+      setActiveChatId(null);
+      setMessages(EMPTY_MESSAGES);
+      setInput("");
+      setError("");
+    }
 
     try {
       await fetch(`/api/assistant-chats/${idToDelete}`, {
@@ -298,19 +330,6 @@ export function AssistantChat() {
           </p>
         </div>
         <span className="statusPill">Gemini</span>
-      </div>
-
-      <div className="assistantHistoryBar">
-        <div>
-          <strong>Saved chats</strong>
-          <span>{historyStatus}</span>
-        </div>
-        <div className="assistantHistoryActions">
-          <button onClick={startNewChat} type="button">New chat</button>
-          <button disabled={!activeChatId} onClick={() => void deleteActiveChat()} type="button">
-            Delete
-          </button>
-        </div>
       </div>
 
       <div className="assistantUsageCard">
@@ -364,59 +383,100 @@ export function AssistantChat() {
         ) : null}
       </div>
 
-      {chats.length ? (
-        <div className="assistantSavedChats" aria-label="Saved chats">
-          {chats.map((chat) => (
-            <button
-              className={chat.id === activeChatId ? "active" : ""}
-              key={chat.id}
-              onClick={() => openChat(chat)}
-              type="button"
-            >
-              <span>{chat.title}</span>
-              <em>{new Date(chat.updatedAt).toLocaleDateString()}</em>
+      <div className="assistantWorkspace">
+        <aside className="assistantSidebar" aria-label="Saved chats">
+          <div className="assistantSidebarHeader">
+            <div>
+              <strong>Saved chats</strong>
+              <span>{historyStatus}</span>
+            </div>
+            <button onClick={startNewChat} type="button">New</button>
+          </div>
+
+          {chats.length ? (
+            <div className="assistantSavedChats">
+              {chats.map((chat) => (
+                <article className={chat.id === activeChatId ? "active" : ""} key={chat.id}>
+                  {editingChatId === chat.id ? (
+                    <form
+                      className="assistantRenameForm"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void renameChat(chat.id);
+                      }}
+                    >
+                      <input
+                        aria-label="Chat title"
+                        autoFocus
+                        onChange={(event) => setEditingTitle(event.target.value)}
+                        value={editingTitle}
+                      />
+                      <div>
+                        <button type="submit">Save</button>
+                        <button onClick={() => setEditingChatId(null)} type="button">Cancel</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <button className="assistantChatOpen" onClick={() => openChat(chat)} type="button">
+                        <span>{chat.title}</span>
+                        <em>{new Date(chat.updatedAt).toLocaleDateString()}</em>
+                      </button>
+                      <div className="assistantChatActions">
+                        <button onClick={() => openChat(chat)} type="button">Continue</button>
+                        <button onClick={() => beginRename(chat)} type="button">Rename</button>
+                        <button onClick={() => void deleteChat(chat.id)} type="button">Delete</button>
+                      </div>
+                    </>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="assistantEmptyChats">No saved chats yet.</p>
+          )}
+        </aside>
+
+        <div className="assistantConversation">
+          <div className="assistantStarters" aria-label="Suggested prompts">
+            {STARTER_PROMPTS.map((prompt) => (
+              <button disabled={isSending} key={prompt} onClick={() => void sendMessage(prompt)} type="button">
+                {prompt}
+              </button>
+            ))}
+          </div>
+
+          <div className="assistantMessages" aria-live="polite">
+            {messages.map((message, index) => (
+              <div className={`assistantMessage ${message.role}`} key={`${message.role}-${index}`}>
+                <span>{message.role === "user" ? "You" : "Assistant"}</span>
+                <p>{message.text}</p>
+              </div>
+            ))}
+            {isSending ? (
+              <div className="assistantMessage assistant">
+                <span>Assistant</span>
+                <p>Thinking...</p>
+              </div>
+            ) : null}
+          </div>
+
+          <form className="assistantComposer" onSubmit={handleSubmit}>
+            <textarea
+              aria-label="Ask the assistant"
+              onChange={(event) => setInput(event.target.value)}
+              placeholder="Ask about allocation, risk, open lots, metals, savings..."
+              rows={3}
+              value={input}
+            />
+            <button disabled={!canSend} type="submit">
+              {isSending ? "Sending" : "Send"}
             </button>
-          ))}
+          </form>
+
+          {error ? <p className="assistantError">{error}</p> : null}
         </div>
-      ) : null}
-
-      <div className="assistantStarters" aria-label="Suggested prompts">
-        {STARTER_PROMPTS.map((prompt) => (
-          <button disabled={isSending} key={prompt} onClick={() => void sendMessage(prompt)} type="button">
-            {prompt}
-          </button>
-        ))}
       </div>
-
-      <div className="assistantMessages" aria-live="polite">
-        {messages.map((message, index) => (
-          <div className={`assistantMessage ${message.role}`} key={`${message.role}-${index}`}>
-            <span>{message.role === "user" ? "You" : "Assistant"}</span>
-            <p>{message.text}</p>
-          </div>
-        ))}
-        {isSending ? (
-          <div className="assistantMessage assistant">
-            <span>Assistant</span>
-            <p>Thinking...</p>
-          </div>
-        ) : null}
-      </div>
-
-      <form className="assistantComposer" onSubmit={handleSubmit}>
-        <textarea
-          aria-label="Ask the assistant"
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Ask about allocation, risk, open lots, metals, savings..."
-          rows={3}
-          value={input}
-        />
-        <button disabled={!canSend} type="submit">
-          {isSending ? "Sending" : "Send"}
-        </button>
-      </form>
-
-      {error ? <p className="assistantError">{error}</p> : null}
     </section>
   );
 }

@@ -29,6 +29,12 @@ function titleFrom(messages: ChatMessage[]) {
   return firstUserMessage.length > 54 ? `${firstUserMessage.slice(0, 54)}...` : firstUserMessage;
 }
 
+function cleanTitle(value: unknown) {
+  const title = String(value ?? "").trim();
+  if (!title) return "";
+  return title.length > 80 ? `${title.slice(0, 80)}...` : title;
+}
+
 function objectId(value: string) {
   return ObjectId.isValid(value) ? new ObjectId(value) : null;
 }
@@ -46,21 +52,26 @@ export async function PATCH(
   const body = await request.json().catch(() => null);
   const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   const messages = cleanMessages(record.messages);
-  if (!messages.length) {
-    return NextResponse.json({ error: "A chat needs at least one message." }, { status: 400 });
+  const title = cleanTitle(record.title);
+  if (!messages.length && !title) {
+    return NextResponse.json({ error: "Send messages or a title to update the chat." }, { status: 400 });
   }
 
   try {
     const db = await getDashboardDb();
+    const $set: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
+    if (messages.length) {
+      $set.messages = messages;
+      if (title) $set.title = title;
+    } else {
+      $set.title = title;
+    }
+
     const result = await db.collection("assistant_chats").updateOne(
       { _id },
-      {
-        $set: {
-          messages,
-          title: titleFrom(messages),
-          updatedAt: new Date(),
-        },
-      },
+      { $set },
     );
 
     if (!result.matchedCount) {
