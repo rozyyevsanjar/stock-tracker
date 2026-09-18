@@ -17,5 +17,6 @@ next-env.d.ts
 
 # Personal portfolio data
 data/*.csv
+data/etoro-sync-state.json
 !data/*.example.csv
 .vercel
