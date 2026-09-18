@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordGeminiUsage } from "@/lib/assistant-usage";
+import { GEMINI_LIMITS, reserveGeminiRequest, rememberGeminiLimit } from "@/lib/gemini-quota";
 import { buildTransactionLots, loadTransactions } from "@/lib/transactions";
 import { loadTrackerPositions } from "@/lib/tracker";
 
@@ -14,12 +15,7 @@ const SAVINGS_ACCOUNTS = [
   { balance: 60163, label: "Savings account 1", rate: 3.5 },
   { balance: 40000, label: "Savings account 2", rate: 6 },
 ];
-const GEMINI_MODELS = [
-  "gemini-3.6-flash",
-  "gemini-3.5-flash",
-  "gemini-3.1-flash-lite",
-  "gemini-2.5-flash-lite",
-];
+const GEMINI_MODELS = GEMINI_LIMITS.map((limit) => limit.model);
 
 function validMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) return [];
@@ -199,6 +195,13 @@ async function askGemini({
   let lastError = "Gemini could not answer right now.";
 
   for (const model of GEMINI_MODELS) {
+    // UTF-8 bytes provide a conservative input-token budget without an extra API call.
+    const inputBudget = Buffer.byteLength(JSON.stringify(contents), "utf8");
+    try {
+      if (!await reserveGeminiRequest(model, inputBudget)) continue;
+    } catch {
+      return { error: "Usage protection is temporarily unavailable. Please try again shortly.", status: 503 };
+    }
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
       {
@@ -217,6 +220,7 @@ async function askGemini({
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      if (response.status === 429) await rememberGeminiLimit(model, data);
       lastError = errorMessage(data) || lastError;
       if (shouldTryNextModel(response.status, lastError)) continue;
       return { error: lastError, status: response.status };
@@ -239,7 +243,7 @@ async function askGemini({
 
   return {
     error:
-      "Gemini is overloaded or unavailable right now. Please try again in a minute; I added fallback models, so this should recover when one becomes available.",
+      "No Gemini model has capacity right now. Try again in a minute; daily quotas reset at midnight Pacific time.",
     status: 503,
   };
 }

@@ -16,10 +16,7 @@ type SavedChat = {
 };
 
 type UsageSummary = {
-  limits: {
-    dailyRequests: number;
-    dailyTokens: number;
-  };
+  quotas: Array<{ model: string; rpm: number; tpm: number; rpd: number; requests: number; minuteRequests: number; minuteTokens: number; blocked: boolean }>;
   lastRequestAt: string | null;
   lastSevenDays: {
     requests: number;
@@ -98,14 +95,6 @@ export function AssistantChat() {
   const [usageStatus, setUsageStatus] = useState("Loading usage...");
 
   const canSend = useMemo(() => input.trim().length > 0 && !isSending, [input, isSending]);
-  const requestPercent = percentage(
-    usage?.today.requests ?? 0,
-    usage?.limits.dailyRequests ?? 0,
-  );
-  const tokenPercent = percentage(
-    usage?.today.tokens ?? 0,
-    usage?.limits.dailyTokens ?? 0,
-  );
   const historyHeaders = useMemo(
     () => ({
       "Content-Type": "application/json",
@@ -128,7 +117,7 @@ export function AssistantChat() {
       }
 
       setUsage(data.usage ?? null);
-      setUsageStatus("Usage tracked from this dashboard.");
+      setUsageStatus("Dashboard usage · daily reset at midnight Pacific");
     } catch (err) {
       setUsageStatus(err instanceof Error ? err.message : "Gemini usage is unavailable.");
     }
@@ -348,20 +337,8 @@ export function AssistantChat() {
             <strong>{formatNumber(usage?.today.requests ?? 0)} requests</strong>
           </div>
           <div>
-            <span>Request use</span>
-            <strong>{formatPercent(requestPercent)}</strong>
-            <em>{formatNumber(usage?.limits.dailyRequests ?? 0)} daily cap</em>
-            <i style={{ "--usage-percent": `${requestPercent}%` } as CSSProperties} />
-          </div>
-          <div>
             <span>Tokens today</span>
             <strong>{formatNumber(usage?.today.tokens ?? 0)}</strong>
-          </div>
-          <div>
-            <span>Token use</span>
-            <strong>{formatPercent(tokenPercent)}</strong>
-            <em>{formatNumber(usage?.limits.dailyTokens ?? 0)} daily cap</em>
-            <i style={{ "--usage-percent": `${tokenPercent}%` } as CSSProperties} />
           </div>
           <div>
             <span>7 days</span>
@@ -371,6 +348,18 @@ export function AssistantChat() {
             <span>Last request</span>
             <strong>{formatUsageDate(usage?.lastRequestAt ?? null)}</strong>
           </div>
+        </div>
+        <div className="assistantUsageGrid">
+          {usage?.quotas.map((quota) => (
+            <div key={quota.model}>
+              <span>{quota.model}</span>
+              <strong>{quota.requests} / {quota.rpd} today · {formatPercent(percentage(quota.requests, quota.rpd))}</strong>
+              <em>{quota.minuteRequests} / {quota.rpm} requests per minute</em>
+              <em>{formatNumber(quota.minuteTokens)} / {formatNumber(quota.tpm)} input token budget per minute · {formatPercent(percentage(quota.minuteTokens, quota.tpm))}</em>
+              {quota.blocked ? <em>Google quota cooldown</em> : null}
+              <i style={{ "--usage-percent": `${percentage(quota.requests, quota.rpd)}%` } as CSSProperties} />
+            </div>
+          ))}
         </div>
         {usage?.models.length ? (
           <div className="assistantUsageModels">

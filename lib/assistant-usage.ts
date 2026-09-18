@@ -1,4 +1,5 @@
 import { getDashboardDb } from "./mongodb";
+import { geminiQuotaSummary, pacificDayStart } from "./gemini-quota";
 
 export type GeminiUsageRecord = {
   createdAt: Date;
@@ -10,10 +11,7 @@ export type GeminiUsageRecord = {
 };
 
 export type GeminiUsageSummary = {
-  limits: {
-    dailyRequests: number;
-    dailyTokens: number;
-  };
+  quotas: Awaited<ReturnType<typeof geminiQuotaSummary>>;
   lastRequestAt: string | null;
   lastSevenDays: {
     requests: number;
@@ -32,18 +30,6 @@ export type GeminiUsageSummary = {
   };
 };
 
-const DEFAULT_DAILY_REQUEST_LIMIT = 1000;
-const DEFAULT_DAILY_TOKEN_LIMIT = 1_000_000;
-
-function positiveEnvNumber(name: string, fallback: number) {
-  const value = Number(process.env[name]);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
-function startOfUtcDay(date = new Date()) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
 export async function recordGeminiUsage(record: Omit<GeminiUsageRecord, "createdAt" | "status">) {
   try {
     const db = await getDashboardDb();
@@ -60,7 +46,7 @@ export async function recordGeminiUsage(record: Omit<GeminiUsageRecord, "created
 export async function getGeminiUsageSummary(): Promise<GeminiUsageSummary> {
   const db = await getDashboardDb();
   const collection = db.collection<GeminiUsageRecord>("assistant_usage");
-  const todayStart = startOfUtcDay();
+  const todayStart = pacificDayStart();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const [todayRows, sevenDayRows, modelRows, lastRow] = await Promise.all([
@@ -111,10 +97,7 @@ export async function getGeminiUsageSummary(): Promise<GeminiUsageSummary> {
   ]);
 
   return {
-    limits: {
-      dailyRequests: positiveEnvNumber("GEMINI_DAILY_REQUEST_LIMIT", DEFAULT_DAILY_REQUEST_LIMIT),
-      dailyTokens: positiveEnvNumber("GEMINI_DAILY_TOKEN_LIMIT", DEFAULT_DAILY_TOKEN_LIMIT),
-    },
+    quotas: await geminiQuotaSummary(),
     lastRequestAt: lastRow[0]?.createdAt?.toISOString() ?? null,
     lastSevenDays: sevenDayRows[0] ?? { requests: 0, tokens: 0 },
     models: modelRows,

@@ -338,7 +338,6 @@ function HoldingValueChart({
 function TabBar({ activeTab }: { activeTab: Tab }) {
   const tabs: Array<{ label: string; value: Tab; href: string }> = [
     { label: "Home", value: "home", href: "/" },
-    { label: "Tracker", value: "tracker", href: "/?tab=tracker" },
     { label: "Transaction history", value: "transactions", href: "/?tab=transactions" },
     { label: "Research", value: "research", href: "/?tab=research" },
     { label: "Assistant", value: "assistant", href: "/?tab=assistant" },
@@ -1011,7 +1010,6 @@ function normalizeTab(value: string | string[] | undefined): Tab {
   if (raw === "research") return "research";
   if (raw === "assistant") return "assistant";
   if (raw === "learn") return "learn";
-  if (raw === "tracker") return "tracker";
   return raw === "transactions" ? "transactions" : "home";
 }
 
@@ -1380,39 +1378,6 @@ export default async function Home({
           <span className="statusPill">Private Gemini</span>
         </header>
         <AssistantChat />
-      </main>
-    );
-  }
-
-  if (activeTab === "tracker") {
-    const displayCurrency = normalizeDisplayCurrency(params.currency);
-    const trackerPositions = await loadTrackerPositions();
-    const displayTrackerPositions = combineStakingEthPositions(trackerPositions);
-    const marketTickers = displayTrackerPositions
-      .map((position) => position.marketTicker)
-      .filter(Boolean);
-    const [quotes, metalPrices, currencyRates] = await Promise.all([
-      fetchQuotes(marketTickers),
-      fetchDubaiMetalPrices(),
-      fetchCurrencyRates(displayCurrency),
-    ]);
-    const trackedPositions = convertTrackedPositions(
-      buildTrackedPositions(displayTrackerPositions, quotes, metalPrices),
-      displayCurrency,
-      currencyRates,
-    );
-
-    return (
-      <main>
-        <TopBar activeTab={activeTab} />
-        <header className="pageHeader">
-          <div>
-            <h1>Tracker</h1>
-            <p>Current positions from your investment workbook, checked against market prices.</p>
-          </div>
-          <span className="statusPill">Default USD</span>
-        </header>
-        <TrackerView displayCurrency={displayCurrency} positions={trackedPositions} />
       </main>
     );
   }
