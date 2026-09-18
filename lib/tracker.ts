@@ -128,6 +128,64 @@ export function buildTrackedPositions(
   });
 }
 
+function isStakingEthPosition(position: TrackerPosition) {
+  return (
+    position.platform.toLowerCase() === "etoro" &&
+    position.ticker === "ETH" &&
+    position.marketTicker === "ETH-USD" &&
+    position.quantity > 0 &&
+    position.quantity < 0.01
+  );
+}
+
+function combinedEthNotes(positions: TrackerPosition[]) {
+  const ids = positions
+    .map((position) => /eToro position\s+(\d+)/i.exec(position.notes)?.[1])
+    .filter(Boolean);
+  return `Combined staking ETH positions${ids.length ? `: ${ids.join(", ")}` : ""}`;
+}
+
+export function combineStakingEthPositions(positions: TrackerPosition[]) {
+  const stakingPositions = positions.filter(isStakingEthPosition);
+  if (stakingPositions.length < 2) return positions;
+
+  const remainingPositions = positions.filter((position) => !isStakingEthPosition(position));
+  const quantity = stakingPositions.reduce((total, position) => total + position.quantity, 0);
+  const costBasis = stakingPositions.reduce(
+    (total, position) => total + position.quantity * position.avgPrice,
+    0,
+  );
+  const snapshotValue = stakingPositions.reduce(
+    (total, position) =>
+      total + (position.snapshotValue ?? position.quantity * (position.snapshotPrice ?? position.avgPrice)),
+    0,
+  );
+  const snapshotPl = stakingPositions.reduce(
+    (total, position) => total + (position.snapshotPl ?? 0),
+    0,
+  );
+  const firstPosition = stakingPositions[0];
+  const combinedPosition: TrackerPosition = {
+    ...firstPosition,
+    asset: "Ethereum staking rewards",
+    avgPrice: quantity ? costBasis / quantity : firstPosition.avgPrice,
+    notes: combinedEthNotes(stakingPositions),
+    quantity,
+    snapshotPl,
+    snapshotPrice: quantity ? snapshotValue / quantity : firstPosition.snapshotPrice,
+    snapshotReturn: costBasis ? snapshotPl / costBasis : firstPosition.snapshotReturn,
+    snapshotValue,
+  };
+
+  const firstStakingIndex = positions.findIndex(isStakingEthPosition);
+  const insertIndex = firstStakingIndex === -1 ? remainingPositions.length : firstStakingIndex;
+  return [
+    ...remainingPositions.slice(0, insertIndex),
+    combinedPosition,
+    ...remainingPositions.slice(insertIndex),
+  ];
+}
+
 async function fetchYahooRate(from: string, to: string) {
   if (from === to) return 1;
 

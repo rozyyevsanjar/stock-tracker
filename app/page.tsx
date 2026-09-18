@@ -13,6 +13,7 @@ import {
   DISPLAY_CURRENCIES,
   type DisplayCurrency,
   buildTrackedPositions,
+  combineStakingEthPositions,
   convertTrackedPositions,
   fetchCurrencyRates,
   fetchDubaiMetalPrices,
@@ -1330,7 +1331,8 @@ export default async function Home({
   if (activeTab === "tracker") {
     const displayCurrency = normalizeDisplayCurrency(params.currency);
     const trackerPositions = await loadTrackerPositions();
-    const marketTickers = trackerPositions
+    const displayTrackerPositions = combineStakingEthPositions(trackerPositions);
+    const marketTickers = displayTrackerPositions
       .map((position) => position.marketTicker)
       .filter(Boolean);
     const [quotes, metalPrices, currencyRates] = await Promise.all([
@@ -1339,7 +1341,7 @@ export default async function Home({
       fetchCurrencyRates(displayCurrency),
     ]);
     const trackedPositions = convertTrackedPositions(
-      buildTrackedPositions(trackerPositions, quotes, metalPrices),
+      buildTrackedPositions(displayTrackerPositions, quotes, metalPrices),
       displayCurrency,
       currencyRates,
     );
@@ -1390,7 +1392,7 @@ export default async function Home({
     loadPortfolioStateFromTransactions(),
     loadTrackerPositions(),
   ]);
-  const homeTrackerPositions = trackerHomePositions(trackerPositions);
+  const homeTrackerPositions = trackerHomePositions(combineStakingEthPositions(trackerPositions));
   const trackerTickerSet = new Set(
     homeTrackerPositions.flatMap((position) => [
       position.ticker,
