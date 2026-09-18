@@ -107,6 +107,7 @@ function LiveTicker({
   lots: Lot[];
 }) {
   const holdingLots = lots.filter((lot) => lot.ticker === holding.ticker);
+  const isSavings = holding.ticker.startsWith("SAVINGS");
 
   return (
     <details className="tickerItem" name="live-tickers">
@@ -123,16 +124,22 @@ function LiveTicker({
           </span>
         </SymbolLink>
         <span className="tickerPrice">
-          <span>{formatCurrency(holding.currentPrice, displayCurrency)}</span>
-          <span className={`tickerDelta ${tone(holding.dailyChange)}`}>
-            {signed(holding.dailyChange, (value) => formatCurrency(value, displayCurrency))} (
-            {formatPercent(Math.abs(holding.dailyChangePercent))})
+          <span>{formatCurrency(holding.currentValue, displayCurrency)}</span>
+          <span className={`tickerDelta ${isSavings ? "positive" : tone(holding.profit)}`}>
+            {isSavings ? (
+              <>Yield {holding.priceSource.replace(" yearly interest", "")}</>
+            ) : (
+              <>
+                P/L {signed(holding.profit, (value) => formatCurrency(value, displayCurrency))} (
+                {formatPercent(holding.profitPercent)})
+              </>
+            )}
           </span>
         </span>
       </summary>
 
       <div className="tickerDetails">
-        {holding.ticker.startsWith("SAVINGS") ? (
+        {isSavings ? (
           <div className="detailGrid">
             <span>Balance</span>
             <strong>{formatCurrency(holding.currentValue, displayCurrency)}</strong>
@@ -1080,6 +1087,55 @@ function trackedPositionToHolding(
   };
 }
 
+function combinedHoldingCompany(ticker: string, holdings: Holding[]) {
+  if (ticker === "ETH") return "Ethereum";
+  if (ticker === "BTC") return "Bitcoin";
+
+  const names = Array.from(
+    new Set(holdings.map((holding) => holding.company.replace(/\s+-\s+Position\s+\d+$/i, "").trim())),
+  ).filter(Boolean);
+  return names.length === 1 ? names[0] : `${ticker} positions`;
+}
+
+function combineHoldingsByTicker(holdings: Holding[]) {
+  const grouped = new Map<string, Holding[]>();
+  for (const holding of holdings) {
+    grouped.set(holding.ticker, [...(grouped.get(holding.ticker) ?? []), holding]);
+  }
+
+  return Array.from(grouped.entries()).map(([ticker, tickerHoldings]) => {
+    if (tickerHoldings.length === 1) return tickerHoldings[0];
+
+    const shares = tickerHoldings.reduce((total, holding) => total + holding.shares, 0);
+    const invested = tickerHoldings.reduce((total, holding) => total + holding.invested, 0);
+    const fees = tickerHoldings.reduce((total, holding) => total + holding.fees, 0);
+    const currentValue = tickerHoldings.reduce((total, holding) => total + holding.currentValue, 0);
+    const previousValue = tickerHoldings.reduce((total, holding) => total + holding.previousValue, 0);
+    const profit = tickerHoldings.reduce((total, holding) => total + holding.profit, 0);
+    const dailyChange = currentValue - previousValue;
+
+    return {
+      ...tickerHoldings[0],
+      company: combinedHoldingCompany(ticker, tickerHoldings),
+      shares,
+      buyPrice: shares ? invested / shares : 0,
+      invested,
+      fees,
+      lots: tickerHoldings.reduce((total, holding) => total + holding.lots, 0),
+      currentPrice: shares ? currentValue / shares : 0,
+      previousPrice: shares ? previousValue / shares : 0,
+      dailyChange,
+      dailyChangePercent: previousValue ? (dailyChange / previousValue) * 100 : 0,
+      currentValue,
+      previousValue,
+      valueDailyChange: dailyChange,
+      profit,
+      profitPercent: invested ? (profit / invested) * 100 : 0,
+      priceSource: Array.from(new Set(tickerHoldings.map((holding) => holding.priceSource))).join(" + "),
+    };
+  });
+}
+
 function savingsHoldings(aedDisplayRate: number): Holding[] {
   return SAVINGS_ACCOUNTS.map((account) => {
     const value = account.balance * aedDisplayRate;
@@ -1427,11 +1483,11 @@ export default async function Home({
     displayCurrency,
     currencyRates,
   ).map(trackedPositionToHolding);
-  const holdings = withAllocation([
+  const holdings = withAllocation(combineHoldingsByTicker([
     ...savingsHoldings(aedDisplayRate),
     ...portfolioHoldings,
     ...trackerHoldings,
-  ]);
+  ]));
   const displayLots = convertLots(portfolioLotsForHome, usdDisplayRate);
   const performance = convertPerformance(buildPerformance(history, lots), usdDisplayRate);
 
@@ -1491,7 +1547,7 @@ export default async function Home({
       <PerformanceChart currency={displayCurrency} points={performance} timeframe={timeframe} />
 
       <section>
-        <h2>Live price ticker</h2>
+        <h2>Live value ticker</h2>
         <div className="tickerGrid">
           {holdings.map((holding) => (
             <LiveTicker
