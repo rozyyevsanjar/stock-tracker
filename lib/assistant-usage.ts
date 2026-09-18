@@ -10,6 +10,10 @@ export type GeminiUsageRecord = {
 };
 
 export type GeminiUsageSummary = {
+  limits: {
+    dailyRequests: number;
+    dailyTokens: number;
+  };
   lastRequestAt: string | null;
   lastSevenDays: {
     requests: number;
@@ -27,6 +31,14 @@ export type GeminiUsageSummary = {
     tokens: number;
   };
 };
+
+const DEFAULT_DAILY_REQUEST_LIMIT = 1000;
+const DEFAULT_DAILY_TOKEN_LIMIT = 1_000_000;
+
+function positiveEnvNumber(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
 
 function startOfUtcDay(date = new Date()) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -99,6 +111,10 @@ export async function getGeminiUsageSummary(): Promise<GeminiUsageSummary> {
   ]);
 
   return {
+    limits: {
+      dailyRequests: positiveEnvNumber("GEMINI_DAILY_REQUEST_LIMIT", DEFAULT_DAILY_REQUEST_LIMIT),
+      dailyTokens: positiveEnvNumber("GEMINI_DAILY_TOKEN_LIMIT", DEFAULT_DAILY_TOKEN_LIMIT),
+    },
     lastRequestAt: lastRow[0]?.createdAt?.toISOString() ?? null,
     lastSevenDays: sevenDayRows[0] ?? { requests: 0, tokens: 0 },
     models: modelRows,

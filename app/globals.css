@@ -270,7 +270,7 @@ summary {
 .assistantUsageGrid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .assistantUsageGrid div {
@@ -278,6 +278,27 @@ summary {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
+}
+
+.assistantUsageGrid em {
+  color: var(--muted);
+  display: block;
+  font-size: 0.76rem;
+  font-style: normal;
+  margin-top: 2px;
+}
+
+.assistantUsageGrid i {
+  background:
+    linear-gradient(
+      90deg,
+      var(--blue) var(--usage-percent),
+      color-mix(in srgb, var(--line), transparent 10%) var(--usage-percent)
+    );
+  border-radius: 999px;
+  display: block;
+  height: 6px;
+  margin-top: 8px;
 }
 
 .assistantUsageModels {

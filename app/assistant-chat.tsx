@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from "react";
 
 type ChatMessage = {
   role: "assistant" | "user";
@@ -16,6 +16,10 @@ type SavedChat = {
 };
 
 type UsageSummary = {
+  limits: {
+    dailyRequests: number;
+    dailyTokens: number;
+  };
   lastRequestAt: string | null;
   lastSevenDays: {
     requests: number;
@@ -62,6 +66,15 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
+function percentage(value: number, limit: number) {
+  if (!limit) return 0;
+  return Math.min((value / limit) * 100, 100);
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
+}
+
 function formatUsageDate(value: string | null) {
   if (!value) return "No requests yet";
   return new Date(value).toLocaleString([], {
@@ -83,6 +96,14 @@ export function AssistantChat() {
   const [usageStatus, setUsageStatus] = useState("Loading usage...");
 
   const canSend = useMemo(() => input.trim().length > 0 && !isSending, [input, isSending]);
+  const requestPercent = percentage(
+    usage?.today.requests ?? 0,
+    usage?.limits.dailyRequests ?? 0,
+  );
+  const tokenPercent = percentage(
+    usage?.today.tokens ?? 0,
+    usage?.limits.dailyTokens ?? 0,
+  );
   const historyHeaders = useMemo(
     () => ({
       "Content-Type": "application/json",
@@ -308,8 +329,20 @@ export function AssistantChat() {
             <strong>{formatNumber(usage?.today.requests ?? 0)} requests</strong>
           </div>
           <div>
+            <span>Request use</span>
+            <strong>{formatPercent(requestPercent)}</strong>
+            <em>{formatNumber(usage?.limits.dailyRequests ?? 0)} daily cap</em>
+            <i style={{ "--usage-percent": `${requestPercent}%` } as CSSProperties} />
+          </div>
+          <div>
             <span>Tokens today</span>
             <strong>{formatNumber(usage?.today.tokens ?? 0)}</strong>
+          </div>
+          <div>
+            <span>Token use</span>
+            <strong>{formatPercent(tokenPercent)}</strong>
+            <em>{formatNumber(usage?.limits.dailyTokens ?? 0)} daily cap</em>
+            <i style={{ "--usage-percent": `${tokenPercent}%` } as CSSProperties} />
           </div>
           <div>
             <span>7 days</span>
