@@ -184,6 +184,118 @@ summary {
   color: var(--accent-contrast);
 }
 
+.assistantPanel {
+  display: grid;
+  gap: 16px;
+}
+
+.assistantIntro {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.assistantIntro h2 {
+  margin: 0 0 6px;
+}
+
+.assistantStarters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.assistantStarters button,
+.assistantComposer button {
+  background: var(--blue);
+  border: 1px solid color-mix(in srgb, var(--blue), var(--line) 30%);
+  border-radius: 8px;
+  color: var(--accent-contrast);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 10px 12px;
+  transition:
+    filter var(--motion),
+    transform var(--motion);
+}
+
+.assistantStarters button {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.assistantStarters button:hover,
+.assistantComposer button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.assistantStarters button:disabled,
+.assistantComposer button:disabled {
+  cursor: progress;
+  filter: grayscale(0.35);
+  opacity: 0.62;
+  transform: none;
+}
+
+.assistantMessages {
+  display: grid;
+  gap: 12px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.assistantMessage {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.assistantMessage.user {
+  background: color-mix(in srgb, var(--blue), transparent 88%);
+}
+
+.assistantMessage span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 850;
+  margin-bottom: 6px;
+}
+
+.assistantMessage p {
+  line-height: 1.55;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.assistantComposer {
+  align-items: stretch;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 110px;
+}
+
+.assistantComposer textarea {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  min-height: 82px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.assistantError {
+  color: var(--red);
+  font-weight: 800;
+  margin: 0;
+}
+
 .themeToggle {
   align-items: center;
   background: var(--panel);
@@ -2133,6 +2245,10 @@ svg:hover .investedLine {
     flex: 1;
     min-width: fit-content;
     text-align: center;
+  }
+
+  .assistantComposer {
+    grid-template-columns: 1fr;
   }
 
   .themeToggle {

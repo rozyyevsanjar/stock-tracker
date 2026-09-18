@@ -38,11 +38,12 @@ import { ThemeToggle } from "./theme-toggle";
 import { CloseLotForm } from "./close-lot-form";
 import { TransactionEditForm } from "./transaction-edit-form";
 import { OpenLotForm } from "./open-lot-form";
+import { AssistantChat } from "./assistant-chat";
 import type { ReactNode } from "react";
 
 export const revalidate = 900;
 
-type Tab = "home" | "tracker" | "transactions" | "research" | "learn";
+type Tab = "home" | "tracker" | "transactions" | "research" | "assistant" | "learn";
 type LotStatusFilter = "all" | "open" | "closed";
 type LotResultFilter = "all" | "profitable" | "loss" | "flat";
 type LotSort = "newest" | "oldest" | "profit" | "loss" | "value";
@@ -327,6 +328,7 @@ function TabBar({ activeTab }: { activeTab: Tab }) {
     { label: "Tracker", value: "tracker", href: "/?tab=tracker" },
     { label: "Transaction history", value: "transactions", href: "/?tab=transactions" },
     { label: "Research", value: "research", href: "/?tab=research" },
+    { label: "Assistant", value: "assistant", href: "/?tab=assistant" },
     { label: "Learn", value: "learn", href: "/?tab=learn" },
   ];
 
@@ -994,6 +996,7 @@ function normalizeTimeframe(value: string | string[] | undefined): Timeframe {
 function normalizeTab(value: string | string[] | undefined): Tab {
   const raw = Array.isArray(value) ? value[0] : value;
   if (raw === "research") return "research";
+  if (raw === "assistant") return "assistant";
   if (raw === "learn") return "learn";
   if (raw === "tracker") return "tracker";
   return raw === "transactions" ? "transactions" : "home";
@@ -1302,6 +1305,22 @@ export default async function Home({
           symbol={symbol}
           timeframe={timeframe}
         />
+      </main>
+    );
+  }
+
+  if (activeTab === "assistant") {
+    return (
+      <main>
+        <TopBar activeTab={activeTab} />
+        <header className="pageHeader">
+          <div>
+            <h1>Assistant</h1>
+            <p>Ask questions about your portfolio, allocation, lots, savings, and tracked assets.</p>
+          </div>
+          <span className="statusPill">Private Gemini</span>
+        </header>
+        <AssistantChat />
       </main>
     );
   }
