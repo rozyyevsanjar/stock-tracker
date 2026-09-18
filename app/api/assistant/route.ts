@@ -11,6 +11,12 @@ type ChatMessage = {
 
 const SAVINGS_BALANCE_AED = 60163;
 const SAVINGS_INTEREST_RATE = 3.5;
+const GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash-lite",
+];
 
 function validMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) return [];
@@ -97,6 +103,7 @@ function geminiContents(messages: ChatMessage[], context: string) {
   const systemText = [
     "You are the user's private portfolio assistant inside their personal dashboard.",
     "Use the provided dashboard context first. Be concise, practical, and clear.",
+    "Default to 250-450 words unless the user explicitly asks for a long report.",
     "Do not claim you can place trades. Do not invent live prices beyond the context.",
     "This is personal finance information, not professional financial advice.",
     context,
@@ -129,6 +136,88 @@ function geminiText(data: Record<string, unknown>) {
     .trim() ?? "";
 }
 
+function finishReason(data: Record<string, unknown>) {
+  const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
+  return String(candidates?.[0]?.finishReason ?? "");
+}
+
+function errorMessage(data: unknown) {
+  return (data as { error?: { message?: string } }).error?.message ?? "";
+}
+
+function shouldTryNextModel(status: number, message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    status === 404 ||
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    normalized.includes("high demand") ||
+    normalized.includes("overloaded") ||
+    normalized.includes("unavailable") ||
+    normalized.includes("no longer available")
+  );
+}
+
+async function askGemini({
+  apiKey,
+  context,
+  messages,
+}: {
+  apiKey: string;
+  context: string;
+  messages: ChatMessage[];
+}) {
+  const contents = geminiContents(messages, context);
+  let lastError = "Gemini could not answer right now.";
+
+  for (const model of GEMINI_MODELS) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            maxOutputTokens: 3000,
+          },
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      lastError = errorMessage(data) || lastError;
+      if (shouldTryNextModel(response.status, lastError)) continue;
+      return { error: lastError, status: response.status };
+    }
+
+    const answer = geminiText(data as Record<string, unknown>);
+    if (!answer) {
+      lastError = "Gemini returned an empty response.";
+      continue;
+    }
+
+    const reason = finishReason(data as Record<string, unknown>);
+    const suffix =
+      reason === "MAX_TOKENS"
+        ? "\n\nNote: I hit the response limit. Ask me to continue and I can pick up from here."
+        : "";
+
+    return { answer: `${answer}${suffix}`, model };
+  }
+
+  return {
+    error:
+      "Gemini is overloaded or unavailable right now. Please try again in a minute; I added fallback models, so this should recover when one becomes available.",
+    status: 503,
+  };
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -145,34 +234,10 @@ export async function POST(request: Request) {
   }
 
   const context = await portfolioContext();
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      body: JSON.stringify({
-        contents: geminiContents(messages, context),
-        generationConfig: {
-          maxOutputTokens: 900,
-        },
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-    },
-  );
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const message =
-      (data as { error?: { message?: string } }).error?.message ??
-      "Gemini could not answer right now.";
-    return NextResponse.json({ error: message }, { status: response.status });
+  const result = await askGemini({ apiKey, context, messages });
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  const answer = geminiText(data as Record<string, unknown>);
-  if (!answer) {
-    return NextResponse.json({ error: "Gemini returned an empty response." }, { status: 502 });
-  }
-
-  return NextResponse.json({ answer });
+  return NextResponse.json({ answer: result.answer, model: result.model });
 }

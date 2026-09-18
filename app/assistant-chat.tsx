@@ -56,7 +56,7 @@ export function AssistantChat() {
       setMessages([...nextMessages, { role: "assistant", text: data.answer }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "The assistant could not answer right now.");
-      setMessages(messages);
+      setMessages(nextMessages);
       setInput(question);
     } finally {
       setIsSending(false);
