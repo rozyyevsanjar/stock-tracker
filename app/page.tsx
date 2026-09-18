@@ -1116,15 +1116,10 @@ function withAllocation(holdings: Holding[]) {
     .sort((a, b) => b.currentValue - a.currentValue);
 }
 
-function trackerHomePositions(positions: TrackerPosition[], portfolioTickers: Set<string>) {
+function trackerHomePositions(positions: TrackerPosition[]) {
   return positions.filter((position) => {
     const ticker = position.ticker.toUpperCase();
-    const marketTicker = position.marketTicker.toUpperCase();
-    const isCommodity =
-      position.assetType.toLowerCase() === "commodity" || ticker === "GOLD" || ticker === "SILVER";
-    const alreadyInPortfolio =
-      portfolioTickers.has(ticker) || (marketTicker ? portfolioTickers.has(marketTicker) : false);
-    return isCommodity || !alreadyInPortfolio;
+    return Boolean(ticker);
   });
 }
 
@@ -1395,11 +1390,17 @@ export default async function Home({
     loadPortfolioStateFromTransactions(),
     loadTrackerPositions(),
   ]);
-  const portfolioTickerSet = new Set(lots.map((lot) => lot.ticker));
-  const homeTrackerPositions = trackerHomePositions(trackerPositions, portfolioTickerSet);
+  const homeTrackerPositions = trackerHomePositions(trackerPositions);
+  const trackerTickerSet = new Set(
+    homeTrackerPositions.flatMap((position) => [
+      position.ticker,
+      position.marketTicker,
+    ]).filter(Boolean),
+  );
+  const portfolioLotsForHome = lots.filter((lot) => !trackerTickerSet.has(lot.ticker));
   const tickers = Array.from(
     new Set([
-      ...lots.map((lot) => lot.ticker),
+      ...portfolioLotsForHome.map((lot) => lot.ticker),
       ...homeTrackerPositions.map((position) => position.marketTicker).filter(Boolean),
     ]),
   );
@@ -1416,7 +1417,7 @@ export default async function Home({
   const usdDisplayRate = currencyRates.get("USD") ?? 1;
   const aedDisplayRate = currencyRates.get("AED") ?? 1;
   const portfolioHoldings = convertHoldings(
-    aggregateLots(lots, quotes, cashBalance).filter((holding) => holding.ticker !== "CASH"),
+    aggregateLots(portfolioLotsForHome, quotes, cashBalance).filter((holding) => holding.ticker !== "CASH"),
     usdDisplayRate,
   );
   const trackerHoldings = convertTrackedPositions(
@@ -1429,7 +1430,7 @@ export default async function Home({
     ...portfolioHoldings,
     ...trackerHoldings,
   ]);
-  const displayLots = convertLots(lots, usdDisplayRate);
+  const displayLots = convertLots(portfolioLotsForHome, usdDisplayRate);
   const performance = convertPerformance(buildPerformance(history, lots), usdDisplayRate);
 
   const totalInvested = holdings.reduce((total, holding) => total + holding.invested, 0);
