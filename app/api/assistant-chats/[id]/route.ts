@@ -9,10 +9,6 @@ type ChatMessage = {
   text: string;
 };
 
-function clientIdFrom(request: Request) {
-  return request.headers.get("x-assistant-client-id")?.trim() ?? "";
-}
-
 function cleanMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) return [];
 
@@ -41,10 +37,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const clientId = clientIdFrom(request);
   const { id } = await params;
   const _id = objectId(id);
-  if (!clientId || !_id) {
+  if (!_id) {
     return NextResponse.json({ error: "Invalid chat update request." }, { status: 400 });
   }
 
@@ -58,7 +53,7 @@ export async function PATCH(
   try {
     const db = await getDashboardDb();
     const result = await db.collection("assistant_chats").updateOne(
-      { _id, clientId },
+      { _id },
       {
         $set: {
           messages,
@@ -83,16 +78,15 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const clientId = clientIdFrom(request);
   const { id } = await params;
   const _id = objectId(id);
-  if (!clientId || !_id) {
+  if (!_id) {
     return NextResponse.json({ error: "Invalid chat delete request." }, { status: 400 });
   }
 
   try {
     const db = await getDashboardDb();
-    await db.collection("assistant_chats").deleteOne({ _id, clientId });
+    await db.collection("assistant_chats").deleteOne({ _id });
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Chat history is unavailable.";

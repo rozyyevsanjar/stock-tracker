@@ -11,16 +11,14 @@ type ChatMessage = {
 
 type SavedChat = {
   _id?: ObjectId;
-  clientId: string;
+  clientId?: string;
   createdAt: Date;
   messages: ChatMessage[];
   title: string;
   updatedAt: Date;
 };
 
-function clientIdFrom(request: Request) {
-  return request.headers.get("x-assistant-client-id")?.trim() ?? "";
-}
+const PERSONAL_CHAT_ID = "personal-dashboard";
 
 function cleanMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) return [];
@@ -52,17 +50,12 @@ function serialize(chat: SavedChat) {
   };
 }
 
-export async function GET(request: Request) {
-  const clientId = clientIdFrom(request);
-  if (!clientId) {
-    return NextResponse.json({ chats: [] });
-  }
-
+export async function GET() {
   try {
     const db = await getDashboardDb();
     const chats = await db
       .collection<SavedChat>("assistant_chats")
-      .find({ clientId })
+      .find({})
       .sort({ updatedAt: -1 })
       .limit(30)
       .toArray();
@@ -75,11 +68,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const clientId = clientIdFrom(request);
-  if (!clientId) {
-    return NextResponse.json({ error: "Missing assistant client id." }, { status: 400 });
-  }
-
   const body = await request.json().catch(() => null);
   const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   const messages = cleanMessages(record.messages);
@@ -91,7 +79,7 @@ export async function POST(request: Request) {
     const db = await getDashboardDb();
     const now = new Date();
     const chat: SavedChat = {
-      clientId,
+      clientId: PERSONAL_CHAT_ID,
       createdAt: now,
       messages,
       title: titleFrom(messages),
