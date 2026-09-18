@@ -47,8 +47,10 @@ type Tab = "home" | "tracker" | "transactions" | "research" | "assistant" | "lea
 type LotStatusFilter = "all" | "open" | "closed";
 type LotResultFilter = "all" | "profitable" | "loss" | "flat";
 type LotSort = "newest" | "oldest" | "profit" | "loss" | "value";
-const SAVINGS_BALANCE_AED = 60163;
-const SAVINGS_INTEREST_RATE = 3.5;
+const SAVINGS_ACCOUNTS = [
+  { balance: 60163, label: "Savings 3.5%", rate: 3.5, ticker: "SAVINGS-35" },
+  { balance: 40000, label: "Savings 6%", rate: 6, ticker: "SAVINGS-60" },
+];
 
 type LotFilters = {
   result: LotResultFilter;
@@ -129,15 +131,18 @@ function LiveTicker({
       </summary>
 
       <div className="tickerDetails">
-        {holding.ticker === "SAVINGS" ? (
+        {holding.ticker.startsWith("SAVINGS") ? (
           <div className="detailGrid">
             <span>Balance</span>
             <strong>{formatCurrency(holding.currentValue, displayCurrency)}</strong>
             <span>Yearly rate</span>
-            <strong>{formatPercent(SAVINGS_INTEREST_RATE)}</strong>
+            <strong>{holding.priceSource.replace(" yearly interest", "")}</strong>
             <span>Yearly interest</span>
             <strong>
-              {formatCurrency(holding.currentValue * (SAVINGS_INTEREST_RATE / 100), displayCurrency)}
+              {formatCurrency(
+                holding.currentValue * (Number.parseFloat(holding.priceSource) / 100),
+                displayCurrency,
+              )}
             </strong>
             <span>Source</span>
             <strong>AED savings</strong>
@@ -159,9 +164,9 @@ function LiveTicker({
 
         {holding.ticker === "CASH" ? (
           <p className="muted">Cash is tracked as uninvested account value.</p>
-        ) : holding.ticker === "SAVINGS" ? (
+        ) : holding.ticker.startsWith("SAVINGS") ? (
           <p className="muted">
-            Savings are stored as AED {formatShares(SAVINGS_BALANCE_AED)} and converted for display.
+            Savings are stored in AED and converted for display.
           </p>
         ) : holdingLots.length === 0 ? (
           <p className="muted">
@@ -235,7 +240,7 @@ function AllocationTable({ holdings }: { holdings: Holding[] }) {
 
 function holdingCategory(holding: Holding) {
   const ticker = holding.ticker.toUpperCase();
-  if (ticker === "SAVINGS") return "Savings";
+  if (ticker.startsWith("SAVINGS")) return "Savings";
   if (ticker === "CASH") return "Cash";
   if (ticker === "GOLD" || ticker === "SILVER") return "Metals";
   if (ticker.includes("BTC") || ticker.includes("ETH") || ticker.endsWith("-USD")) return "Crypto";
@@ -515,7 +520,7 @@ function SymbolLink({
   name?: string;
   showLogo?: boolean;
 }) {
-  if (ticker === "CASH" || ticker === "SAVINGS") {
+  if (ticker === "CASH" || ticker.startsWith("SAVINGS")) {
     return (
       <span className={className}>
         {showLogo ? <AssetLogo name={name} ticker={ticker} /> : null}
@@ -1074,29 +1079,31 @@ function trackedPositionToHolding(
   };
 }
 
-function savingsHolding(aedDisplayRate: number): Holding {
-  const value = SAVINGS_BALANCE_AED * aedDisplayRate;
+function savingsHoldings(aedDisplayRate: number): Holding[] {
+  return SAVINGS_ACCOUNTS.map((account) => {
+    const value = account.balance * aedDisplayRate;
 
-  return {
-    ticker: "SAVINGS",
-    company: "Savings",
-    shares: 1,
-    buyPrice: value,
-    invested: value,
-    fees: 0,
-    lots: 1,
-    currentPrice: value,
-    previousPrice: value,
-    dailyChange: 0,
-    dailyChangePercent: 0,
-    currentValue: value,
-    previousValue: value,
-    valueDailyChange: 0,
-    profit: 0,
-    profitPercent: 0,
-    allocationPercent: 0,
-    priceSource: `${formatPercent(SAVINGS_INTEREST_RATE)} yearly interest`,
-  };
+    return {
+      ticker: account.ticker,
+      company: account.label,
+      shares: 1,
+      buyPrice: value,
+      invested: value,
+      fees: 0,
+      lots: 1,
+      currentPrice: value,
+      previousPrice: value,
+      dailyChange: 0,
+      dailyChangePercent: 0,
+      currentValue: value,
+      previousValue: value,
+      valueDailyChange: 0,
+      profit: 0,
+      profitPercent: 0,
+      allocationPercent: 0,
+      priceSource: `${formatPercent(account.rate)} yearly interest`,
+    };
+  });
 }
 
 function withAllocation(holdings: Holding[]) {
@@ -1418,7 +1425,7 @@ export default async function Home({
     currencyRates,
   ).map(trackedPositionToHolding);
   const holdings = withAllocation([
-    savingsHolding(aedDisplayRate),
+    ...savingsHoldings(aedDisplayRate),
     ...portfolioHoldings,
     ...trackerHoldings,
   ]);

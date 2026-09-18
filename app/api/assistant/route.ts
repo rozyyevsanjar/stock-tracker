@@ -9,8 +9,10 @@ type ChatMessage = {
   text: string;
 };
 
-const SAVINGS_BALANCE_AED = 60163;
-const SAVINGS_INTEREST_RATE = 3.5;
+const SAVINGS_ACCOUNTS = [
+  { balance: 60163, label: "Savings account 1", rate: 3.5 },
+  { balance: 40000, label: "Savings account 2", rate: 6 },
+];
 const GEMINI_MODELS = [
   "gemini-3.6-flash",
   "gemini-3.5-flash",
@@ -84,11 +86,21 @@ async function portfolioContext() {
       `status ${lot.status}`,
     ].join("; "),
   );
+  const savingsLines = SAVINGS_ACCOUNTS.map((account) => {
+    const yearlyInterest = account.balance * (account.rate / 100);
+    return `${account.label}: ${formatMoney(account.balance, "AED")} at ${account.rate}% yearly interest. Estimated yearly interest: ${formatMoney(yearlyInterest, "AED")}.`;
+  });
+  const totalSavings = SAVINGS_ACCOUNTS.reduce((total, account) => total + account.balance, 0);
+  const totalSavingsInterest = SAVINGS_ACCOUNTS.reduce(
+    (total, account) => total + account.balance * (account.rate / 100),
+    0,
+  );
 
   return [
     "Dashboard context:",
     "The visible Home dashboard excludes the uninvested cash bucket.",
-    `Savings: ${formatMoney(SAVINGS_BALANCE_AED, "AED")} at ${SAVINGS_INTEREST_RATE}% yearly interest. Estimated yearly interest: ${formatMoney(SAVINGS_BALANCE_AED * (SAVINGS_INTEREST_RATE / 100), "AED")}.`,
+    `Total savings: ${formatMoney(totalSavings, "AED")}. Combined estimated yearly interest: ${formatMoney(totalSavingsInterest, "AED")}.`,
+    ...savingsLines,
     `Open transaction lots: ${openLots.length}. Closed lots: ${closedLots.length}.`,
     `Open lot value from transaction history: ${formatMoney(openValue)}.`,
     `Total lot P/L from transaction history: ${formatMoney(totalLotProfit)}.`,
