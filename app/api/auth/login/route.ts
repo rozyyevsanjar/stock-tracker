@@ -33,7 +33,11 @@ export async function POST(request: NextRequest) {
   const valid = username === expectedUsername && expectedHash.length === 64 && digest(password) === expectedHash;
   if (!valid) {
     if (activeWindow) await attempts.updateOne({ _id: id }, { $inc: { count: 1 } });
-    else await attempts.replaceOne({ _id: id }, { _id: id, count: 1, windowStartedAt: new Date() }, { upsert: true });
+    else await attempts.updateOne(
+      { _id: id },
+      { $set: { count: 1, windowStartedAt: new Date() } },
+      { upsert: true },
+    );
     return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
   }
 
