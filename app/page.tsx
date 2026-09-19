@@ -496,7 +496,12 @@ function TopBar({ activeTab }: { activeTab: Tab }) {
   return (
     <div className="topBar">
       <TabBar activeTab={activeTab} />
-      <ThemeToggle />
+      <div className="topBarActions">
+        <ThemeToggle />
+        <form action="/api/auth/logout" method="post">
+          <button className="logoutButton" title="Log out" type="submit">Log out</button>
+        </form>
+      </div>
     </div>
   );
 }

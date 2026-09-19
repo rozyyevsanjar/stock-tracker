@@ -108,6 +108,129 @@ summary {
   margin-bottom: 28px;
 }
 
+.topBarActions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.logoutButton {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+  padding: 8px 10px;
+  transition: color var(--motion), border-color var(--motion), background var(--motion);
+}
+
+.logoutButton:hover {
+  background: var(--panel);
+  border-color: var(--blue);
+  color: var(--text);
+}
+
+.loginPage {
+  align-items: center;
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+}
+
+.loginPanel {
+  background: var(--panel-gradient-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-strong);
+  display: grid;
+  gap: 28px;
+  max-width: 400px;
+  padding: 34px;
+  width: 100%;
+}
+
+.loginMark {
+  align-items: center;
+  background: var(--blue);
+  border-radius: 7px;
+  color: var(--accent-contrast);
+  display: flex;
+  font-size: 0.92rem;
+  font-weight: 900;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.loginEyebrow {
+  color: var(--blue);
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 850;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.loginPanel h1 {
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.loginPanel p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.loginPanel form {
+  display: grid;
+  gap: 16px;
+}
+
+.loginPanel label {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.8rem;
+  font-weight: 750;
+  gap: 7px;
+}
+
+.loginPanel input {
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+  padding: 12px;
+}
+
+.loginPanel input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--focus-fill);
+}
+
+.loginPanel button {
+  background: var(--blue);
+  border: 0;
+  border-radius: 6px;
+  color: var(--accent-contrast);
+  cursor: pointer;
+  font-weight: 850;
+  padding: 12px;
+}
+
+.loginPanel .loginError {
+  color: var(--red);
+  font-size: 0.8rem;
+  font-weight: 750;
+  margin: 0;
+}
+
 .pageHeader {
   align-items: end;
   border-bottom: 1px solid var(--line);
@@ -2477,6 +2600,10 @@ svg:hover .investedLine {
   .topBar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topBarActions {
+    justify-content: flex-end;
   }
 
   .tickerItem[open] {
