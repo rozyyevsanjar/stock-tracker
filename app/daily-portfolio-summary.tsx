@@ -13,6 +13,7 @@ export type DailySummaryHolding = {
 };
 
 type SummaryResponse = {
+  degraded?: boolean;
   generatedAt: string;
   summary: string;
   sources: Array<{ publisher: string; title: string; url: string }>;
@@ -53,7 +54,7 @@ export function DailyPortfolioSummary({
           <span>AI daily briefing</span>
           <h2>What moved your portfolio today</h2>
         </div>
-        {briefing ? <time dateTime={briefing.generatedAt}>Updated {new Date(briefing.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time> : null}
+        {briefing ? <time dateTime={briefing.generatedAt}>{briefing.degraded ? "Live-data summary" : "AI summary"} · {new Date(briefing.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time> : null}
       </header>
       {briefing ? (
         <>

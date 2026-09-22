@@ -22,6 +22,7 @@ type DailyBriefing = {
   snapshotHash: string;
   summary: string;
   sources: Array<{ publisher: string; title: string; url: string }>;
+  degraded?: boolean;
 };
 
 function validHoldings(value: unknown): HoldingInput[] {
@@ -45,6 +46,40 @@ function precisePercent(value: number) {
   const absolute = Math.abs(value);
   const digits = absolute === 0 || absolute >= 0.01 ? 2 : absolute >= 0.001 ? 3 : 4;
   return value.toFixed(digits);
+}
+
+function fallbackSummary(
+  holdings: HoldingInput[],
+  currency: string,
+  sources: DailyBriefing["sources"],
+) {
+  const totalValue = holdings.reduce((sum, holding) => sum + holding.currentValue, 0);
+  const totalChange = holdings.reduce((sum, holding) => sum + holding.dailyChange, 0);
+  const previousValue = totalValue - totalChange;
+  const percent = previousValue ? totalChange / previousValue * 100 : 0;
+  const direction = totalChange > 0 ? "gained" : totalChange < 0 ? "lost" : "was unchanged";
+  const amount = `${currency} ${Math.abs(totalChange).toFixed(2)}`;
+  const movers = [...holdings]
+    .filter((holding) => Math.abs(holding.dailyChange) > 0.005)
+    .sort((a, b) => Math.abs(b.dailyChange) - Math.abs(a.dailyChange))
+    .slice(0, 3);
+  const driverLines = movers.length
+    ? movers.map((holding) =>
+      `- **${holding.ticker}**: ${holding.dailyChange >= 0 ? "+" : "-"}${currency} ${Math.abs(holding.dailyChange).toFixed(2)} contribution (${holding.dailyChangePercent >= 0 ? "+" : ""}${precisePercent(holding.dailyChangePercent)}%).`,
+    )
+    : ["- No material market move was available from the current quotes."];
+  const reasonLines = sources.length
+    ? sources.slice(0, 3).map((source) => `- **${source.publisher}** recently covered: “${source.title}”. This may have influenced sentiment, but does not prove causality.`)
+    : ["- No clear asset-specific catalyst was found in the currently available headlines."];
+  return [
+    `The investment portfolio ${direction} **${amount}** (**${precisePercent(Math.abs(percent))}%**) today and is valued at **${currency} ${totalValue.toFixed(2)}**.`,
+    "",
+    "**Main drivers**",
+    ...driverLines,
+    "",
+    "**Possible reasons**",
+    ...reasonLines,
+  ].join("\n");
 }
 
 function usageMetadata(data: Record<string, unknown>) {
@@ -74,7 +109,8 @@ export async function POST(request: Request) {
   const collection = db.collection<DailyBriefing>("daily_portfolio_briefings");
   const id = `${dubaiDay()}:${currency}`;
   const cached = await collection.findOne({ _id: id });
-  if (cached && cached.snapshotHash === snapshotHash && cached.generatedAt.getTime() > Date.now() - 2 * 60 * 60 * 1000) {
+  const cacheLifetime = cached?.degraded ? 10 * 60 * 1000 : 2 * 60 * 60 * 1000;
+  if (cached && cached.snapshotHash === snapshotHash && cached.generatedAt.getTime() > Date.now() - cacheLifetime) {
     return NextResponse.json(cached);
   }
 
@@ -124,20 +160,25 @@ export async function POST(request: Request) {
 
   for (const { model } of GEMINI_LIMITS) {
     if (!await reserveGeminiRequest(model, inputBudget)) continue;
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: 2000,
-          thinkingConfig: model.startsWith("gemini-2.5")
-            ? { thinkingBudget: 0 }
-            : { thinkingLevel: "minimal" },
-        },
-      }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
+    let response: Response;
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: 2000,
+            thinkingConfig: model.startsWith("gemini-2.5")
+              ? { thinkingBudget: 0 }
+              : { thinkingLevel: "minimal" },
+          },
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+    } catch {
+      continue;
+    }
     const data = await response.json().catch(() => ({})) as Record<string, unknown>;
     if (!response.ok) {
       if (response.status === 429) await rememberGeminiLimit(model, data);
@@ -148,13 +189,34 @@ export async function POST(request: Request) {
     if (!summary) continue;
     const usage = usageMetadata(data);
     await recordGeminiUsage({ model, ...usage });
-    const briefing: DailyBriefing = { _id: id, currency, generatedAt: new Date(), snapshotHash, summary, sources };
+    const briefing: DailyBriefing = { _id: id, currency, degraded: false, generatedAt: new Date(), snapshotHash, summary, sources };
     await collection.updateOne(
       { _id: id },
-      { $set: { currency, generatedAt: briefing.generatedAt, snapshotHash, summary, sources } },
+      { $set: { currency, degraded: false, generatedAt: briefing.generatedAt, snapshotHash, summary, sources } },
       { upsert: true },
     );
     return NextResponse.json(briefing);
   }
-  return NextResponse.json({ error: "The AI briefing is temporarily unavailable." }, { status: 503 });
+  const fallback: DailyBriefing = {
+    _id: id,
+    currency,
+    degraded: true,
+    generatedAt: new Date(),
+    snapshotHash,
+    sources,
+    summary: fallbackSummary(holdings, currency, sources),
+  };
+  await collection.updateOne(
+    { _id: id },
+    { $set: {
+      currency,
+      degraded: true,
+      generatedAt: fallback.generatedAt,
+      snapshotHash,
+      sources,
+      summary: fallback.summary,
+    } },
+    { upsert: true },
+  );
+  return NextResponse.json(fallback);
 }
