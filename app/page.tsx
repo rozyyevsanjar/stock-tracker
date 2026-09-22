@@ -1066,9 +1066,12 @@ function trackedPositionToHolding(
     costBasisDisplay: number;
     currentPriceDisplay: number;
     currentValueDisplay: number;
+    dailyChangeDisplay: number;
     profitDisplay: number;
   },
 ): Holding {
+  const previousValue = position.currentValueDisplay - position.dailyChangeDisplay;
+  const previousPrice = position.quantity ? previousValue / position.quantity : position.currentPriceDisplay;
   return {
     ticker: position.ticker,
     company: position.asset,
@@ -1078,12 +1081,12 @@ function trackedPositionToHolding(
     fees: 0,
     lots: 1,
     currentPrice: position.currentPriceDisplay,
-    previousPrice: position.currentPriceDisplay,
-    dailyChange: 0,
-    dailyChangePercent: 0,
+    previousPrice,
+    dailyChange: position.dailyChangeDisplay,
+    dailyChangePercent: position.dailyChangePercent ?? 0,
     currentValue: position.currentValueDisplay,
-    previousValue: position.currentValueDisplay,
-    valueDailyChange: 0,
+    previousValue,
+    valueDailyChange: position.dailyChangeDisplay,
     profit: position.profitDisplay,
     profitPercent: position.returnPercent,
     allocationPercent: 0,

@@ -242,6 +242,7 @@ export function convertTrackedPositions(
       costBasisDisplay: position.costBasis * rate,
       currentPriceDisplay: position.currentPrice * rate,
       currentValueDisplay: position.currentValue * rate,
+      dailyChangeDisplay: (position.dailyChange ?? 0) * rate,
       displayCurrency,
       profitDisplay: position.profit * rate,
       sourceCurrency: currency,
