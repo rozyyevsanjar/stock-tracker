@@ -40,6 +40,7 @@ import { CloseLotForm } from "./close-lot-form";
 import { TransactionEditForm } from "./transaction-edit-form";
 import { OpenLotForm } from "./open-lot-form";
 import { AssistantChat } from "./assistant-chat";
+import { DailyPortfolioSummary } from "./daily-portfolio-summary";
 import type { ReactNode } from "react";
 
 export const revalidate = 900;
@@ -1513,6 +1514,17 @@ export default async function Home({
           help="Unrealized profit or loss divided by total invested capital."
         />
       </section>
+
+      <DailyPortfolioSummary
+        currency={displayCurrency}
+        holdings={holdings.map(({ ticker, company, currentValue, dailyChange, dailyChangePercent }) => ({
+          ticker,
+          company,
+          currentValue,
+          dailyChange,
+          dailyChangePercent,
+        }))}
+      />
 
       <PerformanceChart currency={displayCurrency} points={performance} timeframe={timeframe} />
 
