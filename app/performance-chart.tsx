@@ -133,6 +133,12 @@ export function PerformanceChart({
   const xTickIndexes = Array.from(
     new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]),
   );
+  const contributionIndexes = points
+    .map((point, index) => ({
+      amount: index === 0 ? point.invested : point.invested - points[index - 1].invested,
+      index,
+    }))
+    .filter(({ amount, index }) => index > 0 && Math.abs(amount) > 0.01);
 
   return (
     <section id="portfolio-performance">
@@ -205,6 +211,12 @@ export function PerformanceChart({
           />
           <path d={toPath("invested")} className="investedLine" />
           <path d={toPath("marketValue")} className="valueLine" />
+          {contributionIndexes.map(({ amount, index }) => (
+            <g className="contributionMarker" key={`contribution-${points[index].date}-${index}`}>
+              <circle cx={x(index)} cy={y(points[index].invested)} r="6" />
+              <title>{`${amount > 0 ? "Contribution" : "Withdrawal"}: ${formatCurrency(amount, currency)} on ${formatTooltipDate(points[index].date, timeframe)}`}</title>
+            </g>
+          ))}
           {points.map((point, index) => {
             const pointX = x(index);
             const valueY = y(point.marketValue);
@@ -247,6 +259,7 @@ export function PerformanceChart({
         <div className="chartLegend">
           <span><i className="legendValue" /> Market value</span>
           <span><i className="legendInvested" /> Invested capital</span>
+          {contributionIndexes.length ? <span><i className="legendContribution" /> Contributions</span> : null}
         </div>
       </div>
       <div className="performanceSummary">

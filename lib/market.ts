@@ -373,15 +373,111 @@ async function fetchNasdaqDividend(symbol: string) {
   }
 }
 
-async function fetchStockFundamentals(symbol: string) {
-  const [earnings, dividend] = await Promise.all([
+function compactNumber(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1, notation: "compact" }).format(number);
+}
+
+function metricNumber(value: unknown, suffix = "") {
+  const number = Number(value);
+  return Number.isFinite(number) ? `${number.toFixed(2)}${suffix}` : undefined;
+}
+
+async function fetchYahooChartMetrics(symbol: string) {
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1y&interval=1d`,
+      { headers, next: { revalidate: 3600 } },
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const meta = data.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+    return {
+      fiftyTwoWeekHigh: metricNumber(meta.fiftyTwoWeekHigh),
+      fiftyTwoWeekLow: metricNumber(meta.fiftyTwoWeekLow),
+      source: "Yahoo Finance",
+      sourceUrl: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchNasdaqSummaryMetrics(symbol: string) {
+  try {
+    const response = await fetch(
+      `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/summary?assetclass=stocks`,
+      { headers: nasdaqHeaders, next: { revalidate: 3600 } },
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const summary = data.data?.summaryData;
+    return {
+      marketCap: compactNumber(String(summary?.MarketCap?.value ?? "").replace(/[^\d.-]/g, "")),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function financialNumber(value: unknown) {
+  const number = Number(String(value ?? "").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(number) ? number : null;
+}
+
+async function fetchNasdaqFinancialMetrics(symbol: string) {
+  try {
+    const response = await fetch(
+      `https://api.nasdaq.com/api/company/${encodeURIComponent(symbol)}/financials?frequency=1`,
+      { headers: nasdaqHeaders, next: { revalidate: 21600 } },
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const rows: Array<Record<string, unknown>> = data.data?.incomeStatementTable?.rows ?? [];
+    const revenue = rows.find((row) => row.value1 === "Total Revenue");
+    const netIncome = rows.find((row) => row.value1 === "Net Income");
+    const currentRevenue = financialNumber(revenue?.value2);
+    const previousRevenue = financialNumber(revenue?.value3);
+    const currentIncome = financialNumber(netIncome?.value2);
+    return {
+      profitMargin: currentRevenue && currentIncome !== null
+        ? metricNumber(currentIncome / currentRevenue * 100, "%")
+        : undefined,
+      revenueGrowth: currentRevenue !== null && previousRevenue
+        ? metricNumber((currentRevenue / previousRevenue - 1) * 100, "%")
+        : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchStockFundamentals(symbol: string, quote?: Record<string, unknown>) {
+  const [earnings, dividend, chartMetrics, nasdaqMetrics, financialMetrics] = await Promise.all([
     fetchNasdaqEarnings(symbol),
     fetchNasdaqDividend(symbol),
+    fetchYahooChartMetrics(symbol),
+    fetchNasdaqSummaryMetrics(symbol),
+    fetchNasdaqFinancialMetrics(symbol),
   ]);
 
   return {
     dividend: dividend ?? undefined,
     earnings: earnings ?? undefined,
+    metrics: {
+      beta: metricNumber(quote?.beta),
+      fiftyTwoWeekHigh: chartMetrics?.fiftyTwoWeekHigh,
+      fiftyTwoWeekLow: chartMetrics?.fiftyTwoWeekLow,
+      forwardPE: metricNumber(quote?.forwardPE),
+      marketCap: compactNumber(quote?.marketCap) ?? nasdaqMetrics?.marketCap,
+      profitMargin: metricNumber(Number(quote?.profitMargins) * 100, "%") ?? financialMetrics?.profitMargin,
+      revenueGrowth: metricNumber(Number(quote?.revenueGrowth) * 100, "%") ?? financialMetrics?.revenueGrowth,
+      source: "Yahoo Finance + Nasdaq",
+      sourceUrl: chartMetrics?.sourceUrl ?? `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`,
+      trailingPE: metricNumber(quote?.trailingPE),
+    },
   };
 }
 
@@ -417,7 +513,7 @@ async function fetchStockResearch(symbol: string) {
   const [rssNews, newsData, fundamentals] = await Promise.all([
     fetchYahooRssNews(symbol),
     fetchYahooSearchData(name, 16),
-    fetchStockFundamentals(symbol),
+    fetchStockFundamentals(symbol, quote),
   ]);
   const wikipedia = await fetchWikipediaSummary(name);
 

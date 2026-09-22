@@ -41,6 +41,8 @@ import { TransactionEditForm } from "./transaction-edit-form";
 import { OpenLotForm } from "./open-lot-form";
 import { AssistantChat } from "./assistant-chat";
 import { DailyPortfolioSummary } from "./daily-portfolio-summary";
+import { PortfolioIntelligence } from "./portfolio-intelligence";
+import { calculatePortfolioExposure } from "@/lib/exposure";
 import type { ReactNode } from "react";
 
 export const revalidate = 900;
@@ -342,13 +344,13 @@ function HoldingValueChart({
   );
 }
 
-function TabBar({ activeTab }: { activeTab: Tab }) {
+function TabBar({ activeTab, currency }: { activeTab: Tab; currency: DisplayCurrency }) {
   const tabs: Array<{ label: string; value: Tab; href: string }> = [
-    { label: "Home", value: "home", href: "/" },
-    { label: "Transaction history", value: "transactions", href: "/?tab=transactions" },
-    { label: "Research", value: "research", href: "/?tab=research" },
-    { label: "AI Assistant", value: "assistant", href: "/?tab=assistant" },
-    { label: "Learn", value: "learn", href: "/?tab=learn" },
+    { label: "Home", value: "home", href: `/?currency=${currency}` },
+    { label: "Transaction history", value: "transactions", href: `/?tab=transactions&currency=${currency}` },
+    { label: "Research", value: "research", href: `/?tab=research&currency=${currency}` },
+    { label: "AI Assistant", value: "assistant", href: `/?tab=assistant&currency=${currency}` },
+    { label: "Learn", value: "learn", href: `/?tab=learn&currency=${currency}` },
   ];
 
   return (
@@ -499,10 +501,10 @@ function LearnView() {
   );
 }
 
-function TopBar({ activeTab }: { activeTab: Tab }) {
+function TopBar({ activeTab, currency }: { activeTab: Tab; currency: DisplayCurrency }) {
   return (
     <div className="topBar">
-      <TabBar activeTab={activeTab} />
+      <TabBar activeTab={activeTab} currency={currency} />
       <div className="topBarActions">
         <ThemeToggle />
         <form action="/api/auth/logout" method="post">
@@ -1309,11 +1311,12 @@ export default async function Home({
   const params = searchParams ? await searchParams : {};
   const activeTab = normalizeTab(params.tab);
   const timeframe = normalizeTimeframe(params.range);
+  const displayCurrency = normalizeDisplayCurrency(params.currency);
 
   if (activeTab === "learn") {
     return (
       <main>
-        <TopBar activeTab={activeTab} />
+        <TopBar activeTab={activeTab} currency={displayCurrency} />
         <header className="pageHeader">
           <div>
             <h1>Learn</h1>
@@ -1328,43 +1331,45 @@ export default async function Home({
 
   if (activeTab === "research") {
     const symbol = normalizeResearchSymbol(params.symbol);
-    const { cashBalance, lots } = await loadPortfolioStateFromTransactions();
-    const portfolioTickers = Array.from(new Set(lots.map((lot) => lot.ticker)));
-    const quoteTickers = Array.from(new Set(symbol ? [...portfolioTickers, symbol] : portfolioTickers));
-    const [quotes, history, research]: [
+    const [{ cashBalance, lots }, trackerPositions] = await Promise.all([
+      loadPortfolioStateFromTransactions(),
+      loadTrackerPositions(),
+    ]);
+    const combinedTrackerPositions = trackerHomePositions(combineStakingEthPositions(trackerPositions));
+    const trackerTickerSet = new Set(combinedTrackerPositions.flatMap((position) => [position.ticker, position.marketTicker]).filter(Boolean));
+    const portfolioLots = lots.filter((lot) => !trackerTickerSet.has(lot.ticker));
+    const quoteTickers = Array.from(new Set([
+      ...portfolioLots.map((lot) => lot.ticker),
+      ...combinedTrackerPositions.map((position) => position.marketTicker).filter(Boolean),
+      ...(symbol ? [symbol] : []),
+    ]));
+    const [quotes, history, research, currencyRates, metalPrices]: [
       Record<string, Quote>,
       PricePoint[],
       { profile: ResearchProfile | null; news: ResearchNewsItem[] },
+      Map<string, number>,
+      Awaited<ReturnType<typeof fetchDubaiMetalPrices>>,
     ] = symbol
       ? await Promise.all([
           fetchQuotes(quoteTickers),
           fetchPriceHistory([symbol], timeframe),
           fetchResearchOverview(symbol),
+          fetchCurrencyRates(displayCurrency),
+          fetchDubaiMetalPrices(),
         ])
-      : [await fetchQuotes(quoteTickers), [] as PricePoint[], { profile: null, news: [] }];
-    const holdings = aggregateLots(lots, quotes, cashBalance).filter((holding) => holding.ticker !== "CASH");
-    const exposureHolding = symbol
-      ? holdings.find((holding) => holding.ticker === symbol) ?? null
-      : null;
-    const totalPortfolioValue = holdings.reduce((total, holding) => total + holding.currentValue, 0);
-    const exposure = exposureHolding
-      ? {
-          allocationPercent: exposureHolding.allocationPercent,
-          company: exposureHolding.company,
-          currentValue: exposureHolding.currentValue,
-          dailyChange: exposureHolding.valueDailyChange,
-          invested: exposureHolding.invested,
-          profit: exposureHolding.profit,
-          profitPercent: exposureHolding.profitPercent,
-          shares: exposureHolding.shares,
-          symbol: exposureHolding.ticker,
-          totalPortfolioValue,
-        }
-      : null;
+      : [await fetchQuotes(quoteTickers), [] as PricePoint[], { profile: null, news: [] }, await fetchCurrencyRates(displayCurrency), await fetchDubaiMetalPrices()];
+    const usdDisplayRate = currencyRates.get("USD") ?? 1;
+    const aedDisplayRate = currencyRates.get("AED") ?? 1;
+    const holdings = withAllocation(combineHoldingsByTicker([
+      ...savingsHoldings(aedDisplayRate),
+      ...convertHoldings(aggregateLots(portfolioLots, quotes, cashBalance).filter((holding) => holding.ticker !== "CASH"), usdDisplayRate),
+      ...convertTrackedPositions(buildTrackedPositions(combinedTrackerPositions, quotes, metalPrices), displayCurrency, currencyRates).map(trackedPositionToHolding),
+    ]));
+    const exposure = calculatePortfolioExposure(holdings, symbol);
 
     return (
       <main>
-        <TopBar activeTab={activeTab} />
+        <TopBar activeTab={activeTab} currency={displayCurrency} />
         <header className="pageHeader">
           <div>
             <h1>Research</h1>
@@ -1373,6 +1378,7 @@ export default async function Home({
           <span className="statusPill">Yahoo + CoinGecko</span>
         </header>
         <ResearchView
+          currency={displayCurrency}
           exposure={exposure}
           history={history}
           news={research.news}
@@ -1386,17 +1392,18 @@ export default async function Home({
   }
 
   if (activeTab === "assistant") {
+    const initialPrompt = typeof params.prompt === "string" ? params.prompt.slice(0, 800) : "";
     return (
       <main>
-        <TopBar activeTab={activeTab} />
+        <TopBar activeTab={activeTab} currency={displayCurrency} />
         <header className="pageHeader">
           <div>
-            <h1>Assistant</h1>
+            <h1>Portfolio Assistant</h1>
             <p>Ask questions about your portfolio, allocation, lots, savings, and tracked assets.</p>
           </div>
-          <span className="statusPill">Private Gemini</span>
+          <span className="statusPill">Powered by Gemini</span>
         </header>
-        <AssistantChat />
+        <AssistantChat currency={displayCurrency} initialPrompt={initialPrompt} />
       </main>
     );
   }
@@ -1413,7 +1420,7 @@ export default async function Home({
 
     return (
       <main>
-        <TopBar activeTab={activeTab} />
+        <TopBar activeTab={activeTab} currency={displayCurrency} />
         <header className="pageHeader">
           <div>
             <h1>Transaction History</h1>
@@ -1427,7 +1434,6 @@ export default async function Home({
     );
   }
 
-  const displayCurrency = normalizeDisplayCurrency(params.currency);
   const [{ cashBalance, lots }, trackerPositions] = await Promise.all([
     loadPortfolioStateFromTransactions(),
     loadTrackerPositions(),
@@ -1489,7 +1495,7 @@ export default async function Home({
 
   return (
     <main>
-      <TopBar activeTab={activeTab} />
+      <TopBar activeTab={activeTab} currency={displayCurrency} />
       <header className="pageHeader">
         <div>
           <h1>Personal Investment Assistant</h1>
@@ -1565,9 +1571,7 @@ export default async function Home({
       </section>
 
       <div className="dashboardGrid">
-        <HoldingValueChart displayCurrency={displayCurrency} holdings={holdings} />
-        <AllocationTable holdings={holdings} />
-        <CategoryAllocationTable displayCurrency={displayCurrency} holdings={holdings} />
+        <PortfolioIntelligence currency={displayCurrency} holdings={holdings} />
       </div>
     </main>
   );

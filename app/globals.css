@@ -339,6 +339,31 @@ summary {
   margin: 0 0 6px;
 }
 
+.assistantContextBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.assistantPrivacy {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 10px;
+}
+
+.assistantPrivacy summary {
+  color: var(--blue);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.assistantPrivacy p {
+  line-height: 1.5;
+  margin-top: 8px;
+  max-width: 720px;
+}
+
 .assistantStarters {
   display: flex;
   flex-wrap: wrap;
@@ -552,6 +577,10 @@ summary {
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
 }
 
+.assistantSidebarToggle {
+  display: none;
+}
+
 .assistantSidebar,
 .assistantConversation {
   min-width: 0;
@@ -731,6 +760,50 @@ summary {
   border-color: color-mix(in srgb, var(--line), var(--blue) 38%);
 }
 
+.assistantMessage.scenarioResult {
+  border-color: color-mix(in srgb, var(--blue), var(--line) 32%);
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.scenarioLabel {
+  color: var(--blue);
+  display: block;
+  font-size: 0.75rem;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.scenarioSummary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+}
+
+.scenarioMetrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.scenarioMetrics > div {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
+.scenarioMetrics > div.changed { border-color: color-mix(in srgb, var(--blue), var(--line) 42%); }
+.scenarioMetrics span { color: var(--muted); font-size: 0.7rem; }
+.scenarioMetrics strong { font-size: 0.8rem; }
+.scenarioMetrics i { color: var(--blue); font-style: normal; padding: 0 3px; }
+.scenarioSummary table { border-collapse: collapse; font-size: 0.76rem; min-width: 620px; width: 100%; }
+.scenarioSummary th,
+.scenarioSummary td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; }
+.scenarioSummary p { color: var(--muted); font-size: 0.72rem; margin-top: 9px; }
+
 .assistantMessage > span {
   color: var(--muted);
   display: block;
@@ -773,6 +846,24 @@ summary {
 .assistantMarkdown th,
 .assistantMarkdown td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 .assistantMarkdown img { max-width: 100%; height: auto; }
+
+.assistantResearchLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.assistantResearchLinks a,
+.researchActions a {
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 38%);
+  border-radius: 6px;
+  color: var(--blue);
+  font-size: 0.8rem;
+  font-weight: 750;
+  padding: 8px 10px;
+  text-decoration: none;
+}
 
 .assistantComposer {
   align-items: stretch;
@@ -865,6 +956,120 @@ summary {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 34px 0;
 }
+
+.portfolioIntelligence {
+  grid-column: 1 / -1;
+}
+
+.segmentedControl {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: flex;
+  padding: 3px;
+}
+
+.segmentedControl button {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+  padding: 7px 9px;
+}
+
+.segmentedControl button.active {
+  background: var(--blue);
+  color: var(--accent-contrast);
+}
+
+.concentrationStrip {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+}
+
+.concentrationStrip span {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.76rem;
+  gap: 5px;
+}
+
+.concentrationStrip strong { color: var(--text); font-size: 0.9rem; }
+
+.exposureDimensions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 16px;
+}
+
+.exposureDimensions span {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 6px 9px;
+}
+
+.exposureDimensions strong { color: var(--text); }
+
+.portfolioValueBars {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+}
+
+.portfolioValueBars > div {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 82px minmax(80px, 1fr) 110px;
+}
+
+.portfolioValueBars span { color: var(--muted); font-size: 0.76rem; font-weight: 750; }
+.portfolioValueBars > div > i { background: var(--line); border-radius: 3px; height: 6px; overflow: hidden; }
+.portfolioValueBars b { background: var(--blue); display: block; height: 100%; }
+.portfolioValueBars strong { font-size: 0.78rem; text-align: right; }
+
+.allocationTargetsGrid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.allocationTargetsGrid h3 {
+  font-size: 0.84rem;
+  margin: 0 0 12px;
+}
+
+.targetList { display: grid; gap: 8px; }
+.targetRow {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(80px, 1fr) 70px 58px;
+}
+.targetRow span { color: var(--muted); font-size: 0.8rem; }
+.targetRow label { align-items: center; display: flex; font-size: 0.75rem; gap: 3px; }
+.targetRow input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 6px;
+  width: 52px;
+}
+.targetRow strong { font-size: 0.78rem; text-align: right; }
 
 .tickerGrid {
   align-items: start;
@@ -1797,6 +2002,27 @@ section {
   margin-top: 18px;
 }
 
+.fundamentalMetrics {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+  overflow: hidden;
+}
+
+.fundamentalMetrics div {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.fundamentalMetrics span { color: var(--muted); font-size: 0.75rem; }
+.fundamentalMetrics strong { font-size: 0.8rem; }
+.fundamentalMetrics > a { color: var(--blue); font-size: 0.72rem; grid-column: 1 / -1; padding-top: 8px; text-decoration: none; }
+
 .fundamentalCard {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -1891,6 +2117,18 @@ section {
   font-style: normal;
 }
 
+.newsTag {
+  border: 1px solid color-mix(in srgb, var(--line), var(--blue) 30%);
+  border-radius: 999px;
+  color: var(--blue);
+  font-size: 0.65rem;
+  font-style: normal;
+  font-weight: 800;
+  justify-self: start;
+  padding: 3px 6px;
+  text-transform: uppercase;
+}
+
 .newsItem:not(:has(img)) {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -1941,6 +2179,48 @@ section {
   line-height: 1.55;
   margin-top: 16px;
 }
+
+.exposurePositionLine,
+.researchActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 15px;
+}
+
+.exposurePositionLine {
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  padding-top: 14px;
+}
+
+.exposureOverlap {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 14px;
+}
+
+.exposureOverlap summary { color: var(--blue); cursor: pointer; font-weight: 750; }
+.exposureOverlap p { margin-top: 8px; }
+.researchActions a:first-child { background: var(--blue); color: var(--accent-contrast); }
+
+.dailyBriefingEvidence {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 10px;
+}
+
+.dailyBriefingEvidence summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.dailyBriefingEvidence .dailyBriefingSources { border-top: 0; margin-top: 8px; padding-top: 0; }
+
+.contributionMarker circle { fill: var(--green); stroke: var(--panel); stroke-width: 2; }
+.legendContribution { background: var(--green); border-radius: 50%; height: 8px !important; width: 8px !important; }
 
 .lotFilterPanel {
   background: var(--panel-2);
@@ -2718,9 +2998,29 @@ svg:hover .investedLine {
   }
 
   .assistantSidebar {
+    display: none;
     max-height: none;
     position: static;
   }
+
+  .assistantSidebar.open { display: grid; }
+
+  .assistantSidebarToggle {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    display: block;
+    font-weight: 750;
+    padding: 10px 12px;
+    text-align: left;
+  }
+
+  .portfolioIntelligence { grid-column: span 1; }
+
+  .allocationTargetsGrid,
+  .concentrationStrip { grid-template-columns: 1fr; }
 
   .assistantSavedChats {
     max-height: 320px;

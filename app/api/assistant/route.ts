@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { recordGeminiUsage } from "@/lib/assistant-usage";
 import { GEMINI_LIMITS, reserveGeminiRequest, rememberGeminiLimit } from "@/lib/gemini-quota";
 import { buildTransactionLots, loadTransactions } from "@/lib/transactions";
-import { loadTrackerPositions } from "@/lib/tracker";
+import { combineStakingEthPositions, fetchCurrencyRates, loadTrackerPositions, type DisplayCurrency } from "@/lib/tracker";
 
 export const runtime = "nodejs";
 
@@ -16,6 +16,112 @@ const SAVINGS_ACCOUNTS = [
   { balance: 40000, label: "Savings account 2", rate: 6 },
 ];
 const GEMINI_MODELS = GEMINI_LIMITS.map((limit) => limit.model);
+
+type ScenarioHolding = { category: string; country: string; sector: string; symbol: string; value: number };
+
+function scenarioProfile(symbol: string) {
+  const normalized = symbol.toUpperCase();
+  if (["BTC", "BTC-USD", "ETH", "ETH-USD", "SOL", "SOL-USD"].includes(normalized)) return { category: "Crypto", country: "Global", sector: "Crypto" };
+  if (["GOLD", "SILVER"].includes(normalized)) return { category: "Metals", country: "Global", sector: "Precious metals" };
+  if (["VWRA", "VWRL"].includes(normalized)) return { category: "Global equities", country: "Global", sector: "Broad market ETF" };
+  if (["VOO", "SPY", "CSPX", "VUAA", "QQQ"].includes(normalized)) return { category: "Global equities", country: "United States", sector: normalized === "QQQ" ? "Technology" : "Broad market ETF" };
+  const known: Record<string, { country: string; sector: string }> = {
+    AAL: { country: "United States", sector: "Industrials" },
+    "BMW.DE": { country: "Germany", sector: "Consumer discretionary" },
+    NVDA: { country: "United States", sector: "Technology" },
+  };
+  return { category: "Individual stocks", ...(known[normalized] ?? { country: "Other", sector: "Other" }) };
+}
+
+function parseScenarioRequests(text: string) {
+  const matches = [
+    ...text.matchAll(/\b(AED|USD|EUR)\s*([\d,.]+)\s+(?:in|into)\s+([A-Z][A-Z0-9.-]{1,9})/gi),
+    ...text.matchAll(/\b([\d,.]+)\s*(AED|USD|EUR)\s+(?:in|into)\s+([A-Z][A-Z0-9.-]{1,9})/gi),
+  ];
+  return matches.map((match) => {
+    const currencyFirst = /^[A-Z]{3}$/i.test(match[1]);
+    return {
+      amount: Number(String(currencyFirst ? match[2] : match[1]).replace(/,/g, "")),
+      currency: String(currencyFirst ? match[1] : match[2]).toUpperCase(),
+      symbol: String(match[3]).toUpperCase(),
+    };
+  }).filter((item) => Number.isFinite(item.amount) && item.amount > 0);
+}
+
+async function buildScenario(messages: ChatMessage[], currency: DisplayCurrency) {
+  const request = messages.filter((message) => message.role === "user").at(-1)?.text ?? "";
+  const additions = parseScenarioRequests(request);
+  if (!additions.length || !/\b(simulate|scenario|what if|invest)\b/i.test(request)) return null;
+
+  const [positions, rates] = await Promise.all([loadTrackerPositions(), fetchCurrencyRates(currency)]);
+  const rawHoldings: ScenarioHolding[] = combineStakingEthPositions(positions).map((position) => {
+    const sourceCurrency = position.valueCurrency || position.priceCurrency || "USD";
+    const value = (position.snapshotValue ?? position.quantity * (position.snapshotPrice ?? position.avgPrice)) * (rates.get(sourceCurrency) ?? 1);
+    return { ...scenarioProfile(position.ticker), symbol: position.ticker, value };
+  });
+  rawHoldings.push({ category: "Savings", country: "United Arab Emirates", sector: "Cash & savings", symbol: "SAVINGS", value: SAVINGS_ACCOUNTS.reduce((sum, account) => sum + account.balance, 0) * (rates.get("AED") ?? 1) });
+  const holdings = Array.from(rawHoldings.reduce((map, holding) => {
+    const existing = map.get(holding.symbol);
+    if (existing) existing.value += holding.value;
+    else map.set(holding.symbol, { ...holding });
+    return map;
+  }, new Map<string, ScenarioHolding>()).values());
+
+  const convertedAdditions = additions.map((item) => ({
+    ...item,
+    value: item.amount * (rates.get(item.currency) ?? 1),
+  }));
+  const proposed = [...holdings];
+  for (const addition of convertedAdditions) {
+    const existing = proposed.find((holding) => holding.symbol === addition.symbol);
+    if (existing) existing.value += addition.value;
+    else proposed.push({ ...scenarioProfile(addition.symbol), symbol: addition.symbol, value: addition.value });
+  }
+
+  const total = (items: ScenarioHolding[]) => items.reduce((sum, item) => sum + item.value, 0);
+  const percent = (items: ScenarioHolding[], predicate: (item: ScenarioHolding) => boolean) => {
+    const denominator = total(items);
+    return denominator ? items.filter(predicate).reduce((sum, item) => sum + item.value, 0) / denominator * 100 : 0;
+  };
+  const largest = (items: ScenarioHolding[]) => {
+    const denominator = total(items);
+    const value = Math.max(...items.map((item) => item.value), 0);
+    return denominator ? value / denominator * 100 : 0;
+  };
+  const metric = (label: string, predicate: (item: ScenarioHolding) => boolean) => ({ label, before: percent(holdings, predicate), after: percent(proposed, predicate), format: "percent" });
+  const weightedPercent = (items: ScenarioHolding[], weight: (item: ScenarioHolding) => number) => {
+    const denominator = total(items);
+    return denominator ? items.reduce((sum, item) => sum + item.value * weight(item), 0) / denominator * 100 : 0;
+  };
+  const weightedMetric = (label: string, weight: (item: ScenarioHolding) => number) => ({ label, before: weightedPercent(holdings, weight), after: weightedPercent(proposed, weight), format: "percent" });
+  const technologyEtfWeights: Record<string, number> = { CSPX: 0.3, QQQ: 0.5, SPY: 0.3, VOO: 0.3, VUAA: 0.3, VWRA: 0.25, VWRL: 0.25 };
+  const usEtfWeights: Record<string, number> = { CSPX: 1, QQQ: 1, SPY: 1, VOO: 1, VUAA: 1, VWRA: 0.62, VWRL: 0.62 };
+  const nvdaEtfWeights: Record<string, number> = { CSPX: 0.079, QQQ: 0.091, SPY: 0.079, VOO: 0.079, VUAA: 0.079, VWRA: 0.052, VWRL: 0.052 };
+  const categories = ["Savings", "Global equities", "Individual stocks", "Crypto", "Metals", "Bonds / Sukuk"];
+
+  return {
+    currency,
+    metrics: [
+      { label: "Total portfolio value", before: total(holdings), after: total(proposed), format: "currency" },
+      metric("Savings", (item) => item.category === "Savings"),
+      metric("Equity", (item) => item.category === "Global equities" || item.category === "Individual stocks"),
+      metric("Crypto", (item) => item.category === "Crypto"),
+      metric("Metals", (item) => item.category === "Metals"),
+      { label: "Largest position", before: largest(holdings), after: largest(proposed), format: "percent" },
+      weightedMetric("Technology exposure", (item) => item.sector === "Technology" ? 1 : (technologyEtfWeights[item.symbol] ?? 0)),
+      weightedMetric("US exposure", (item) => item.category === "Individual stocks" && item.country === "United States" ? 1 : (usEtfWeights[item.symbol] ?? 0)),
+      weightedMetric("Effective NVDA exposure", (item) => item.symbol === "NVDA" ? 1 : (nvdaEtfWeights[item.symbol] ?? 0)),
+    ],
+    allocation: categories.map((category) => ({
+      category,
+      currentPercent: percent(holdings, (item) => item.category === category),
+      currentValue: holdings.filter((item) => item.category === category).reduce((sum, item) => sum + item.value, 0),
+      proposedPercent: percent(proposed, (item) => item.category === category),
+      proposedValue: proposed.filter((item) => item.category === category).reduce((sum, item) => sum + item.value, 0),
+    })),
+    note: "Converted using the current FX rate.",
+  };
+}
 
 function validMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) return [];
@@ -41,7 +147,7 @@ function formatMoney(value: number, currency = "USD") {
   }).format(value);
 }
 
-async function portfolioContext() {
+async function portfolioContext(currency = "USD") {
   const [transactions, trackerPositions] = await Promise.all([
     loadTransactions(),
     loadTrackerPositions(),
@@ -95,6 +201,7 @@ async function portfolioContext() {
 
   return [
     "Dashboard context:",
+    `The user's selected analysis currency is ${currency}. Express comparisons and scenario summaries in ${currency}; clearly label source-currency figures that cannot be converted from the supplied context.`,
     "The visible Home dashboard excludes the uninvested cash bucket.",
     `Total savings: ${formatMoney(totalSavings, "AED")}. Combined estimated yearly interest: ${formatMoney(totalSavingsInterest, "AED")}.`,
     ...savingsLines,
@@ -114,6 +221,7 @@ function geminiContents(messages: ChatMessage[], context: string) {
     "Use the provided dashboard context first. Be concise, practical, and clear.",
     "Format replies in Markdown: bold key figures, use italics for emphasis, short headings and lists when helpful, and tables for comparisons. Use occasional relevant emoji when appropriate. Do not wrap the whole reply in a code block.",
     "Default to 250-450 words unless the user explicitly asks for a long report.",
+    "For an investment simulation, lead with a 'Before vs after' Markdown table, then show allocation changes, sector and geographic exposure, and concentration changes. Clearly label assumptions and distinguish direct holdings from estimated ETF overlap.",
     "Do not claim you can place trades. Do not invent live prices beyond the context.",
     "This is personal finance information, not professional financial advice.",
     context,
@@ -259,12 +367,14 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
+  const requestedCurrency = String((body as Record<string, unknown> | null)?.currency ?? "USD");
+  const currency = ["USD", "EUR", "AED"].includes(requestedCurrency) ? requestedCurrency : "USD";
   const messages = validMessages((body as Record<string, unknown> | null)?.messages);
   if (!messages.length) {
     return NextResponse.json({ error: "Send a message first." }, { status: 400 });
   }
 
-  const context = await portfolioContext();
+  const context = await portfolioContext(currency);
   const result = await askGemini({ apiKey, context, messages });
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });
@@ -277,5 +387,6 @@ export async function POST(request: Request) {
     totalTokens: result.usage.totalTokens,
   });
 
-  return NextResponse.json({ answer: result.answer, model: result.model });
+  const scenario = await buildScenario(messages, currency as DisplayCurrency);
+  return NextResponse.json({ answer: result.answer, model: result.model, scenario });
 }

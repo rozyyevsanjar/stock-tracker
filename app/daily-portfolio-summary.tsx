@@ -62,13 +62,16 @@ export function DailyPortfolioSummary({
             <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml>{briefing.summary}</ReactMarkdown>
           </div>
           {briefing.sources.length ? (
-            <div className="dailyBriefingSources">
-              {briefing.sources.slice(0, 4).map((source) => (
-                <a href={source.url} key={source.url} rel="noopener noreferrer" target="_blank">
-                  <span>{source.publisher}</span>{source.title}
-                </a>
-              ))}
-            </div>
+            <details className="dailyBriefingEvidence">
+              <summary>Why did these assets move?</summary>
+              <div className="dailyBriefingSources">
+                {briefing.sources.slice(0, 4).map((source) => (
+                  <a href={source.url} key={source.url} rel="noopener noreferrer" target="_blank">
+                    <span>{source.publisher}</span>{source.title}
+                  </a>
+                ))}
+              </div>
+            </details>
           ) : null}
         </>
       ) : <p className="dailyBriefingLoading">{status}</p>}

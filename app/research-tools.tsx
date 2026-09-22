@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney, formatPercent, signed } from "@/lib/format";
 import { assetLogoFallback, assetLogoUrl } from "@/lib/logos";
+import type { PortfolioExposure } from "@/lib/exposure";
 import type { PricePoint, Quote, ResearchNewsItem, ResearchProfile } from "@/lib/types";
 
 type Timeframe = "1d" | "1w" | "1m" | "1y" | "all";
@@ -17,19 +18,6 @@ type Suggestion = {
 type WatchlistItem = {
   addedAt: string;
   symbol: string;
-};
-
-type PortfolioExposure = {
-  allocationPercent: number;
-  company: string;
-  currentValue: number;
-  dailyChange: number;
-  invested: number;
-  profit: number;
-  profitPercent: number;
-  shares: number;
-  symbol: string;
-  totalPortfolioValue: number;
 };
 
 const TIMEFRAMES: Array<{ label: string; value: Timeframe }> = [
@@ -71,7 +59,7 @@ function formatDate(value: string) {
   });
 }
 
-function limitDescription(value: string, maxLength = 520) {
+function limitDescription(value: string, maxLength = 320) {
   if (value.length <= maxLength) return value;
   const clipped = value.slice(0, maxLength);
   const lastSentence = Math.max(
@@ -531,6 +519,18 @@ function ResearchPriceChart({
 
 function ResearchProfilePanel({ profile }: { profile: ResearchProfile | null }) {
   const fundamentals = profile?.fundamentals;
+  const metrics = fundamentals?.metrics;
+  const metricRows = metrics ? [
+    ["Market cap", metrics.marketCap],
+    ["P/E", metrics.trailingPE],
+    ["Forward P/E", metrics.forwardPE],
+    ["Revenue growth", metrics.revenueGrowth],
+    ["EPS growth", metrics.epsGrowth],
+    ["Profit margin", metrics.profitMargin],
+    ["52-week high", metrics.fiftyTwoWeekHigh],
+    ["52-week low", metrics.fiftyTwoWeekLow],
+    ["Beta", metrics.beta],
+  ] : [];
 
   return (
     <section className="profileCard">
@@ -576,6 +576,15 @@ function ResearchProfilePanel({ profile }: { profile: ResearchProfile | null }) 
               Website
             </a>
           ) : null}
+        </div>
+      ) : null}
+
+      {metricRows.length ? (
+        <div className="fundamentalMetrics">
+          {metricRows.map(([label, value]) => (
+            <div key={label}><span>{label}</span><strong>{value || "Unavailable"}</strong></div>
+          ))}
+          <a href={metrics?.sourceUrl} rel="noreferrer" target="_blank">Source: {metrics?.source}</a>
         </div>
       ) : null}
 
@@ -640,6 +649,16 @@ function ResearchProfilePanel({ profile }: { profile: ResearchProfile | null }) 
   );
 }
 
+function newsTag(title: string) {
+  if (/earnings|revenue|profit|quarter|guidance/i.test(title)) return "Earnings";
+  if (/launch|product|chip|platform|service|model/i.test(title)) return "Product";
+  if (/regulat|court|lawsuit|government|antitrust/i.test(title)) return "Regulation";
+  if (/analyst|rating|target|upgrade|downgrade/i.test(title)) return "Analyst";
+  if (/fed|inflation|rates|economy|tariff|market/i.test(title)) return "Macro";
+  if (/rival|compet|versus|vs\./i.test(title)) return "Competitor";
+  return "Company";
+}
+
 function ResearchNewsPanel({ news }: { news: ResearchNewsItem[] }) {
   return (
     <section className="newsCard">
@@ -656,6 +675,7 @@ function ResearchNewsPanel({ news }: { news: ResearchNewsItem[] }) {
             <a className="newsItem" href={item.url} key={item.url} rel="noreferrer" target="_blank">
               {item.thumbnail ? <img alt="" src={item.thumbnail} /> : null}
               <span>
+                <i className="newsTag">{newsTag(item.title)}</i>
                 <strong>{item.title}</strong>
                 <em>
                   {item.publisher}
@@ -673,12 +693,17 @@ function ResearchNewsPanel({ news }: { news: ResearchNewsItem[] }) {
 }
 
 function PortfolioExposurePanel({
+  currency,
   exposure,
   symbol,
 }: {
-  exposure: PortfolioExposure | null;
+  currency: string;
+  exposure: PortfolioExposure;
   symbol: string;
 }) {
+  const holding = exposure.holding;
+  const hasExposure = exposure.effectiveValue > 0;
+  const scenarioPrompt = `Simulate investing 1,000 ${currency} in ${symbol}. Show before and after allocation, sector and geographic exposure, and concentration risk.`;
   return (
     <section className="exposureCard">
       <div className="sectionHeader">
@@ -689,47 +714,59 @@ function PortfolioExposurePanel({
         <span className="statusPill">Decision intelligence</span>
       </div>
 
-      {exposure ? (
+      {hasExposure ? (
         <>
           <p className="exposureSummary">
-            You currently hold <strong>{formatPercent(exposure.allocationPercent, 1)}</strong>{" "}
-            {exposure.symbol} exposure.
+            Your effective <strong>{symbol}</strong> exposure is <strong>{formatPercent(exposure.allocationPercent, 1)}</strong> of overall assets, including direct holdings and estimated ETF overlap.
           </p>
           <div className="exposureGrid">
             <div>
-              <span>Position value</span>
-              <strong>{formatMoney(exposure.currentValue)}</strong>
+              <span>Direct exposure</span>
+              <strong>{formatMoney(exposure.directValue)}</strong>
             </div>
             <div>
-              <span>Shares / units</span>
-              <strong>{exposure.shares.toLocaleString("en-US", { maximumFractionDigits: 8 })}</strong>
+              <span>Indirect via ETFs</span>
+              <strong>{formatMoney(exposure.indirectValue)}</strong>
             </div>
             <div>
-              <span>Invested</span>
-              <strong>{formatMoney(exposure.invested)}</strong>
+              <span>Overall assets</span>
+              <strong>{formatPercent(exposure.allocationPercent, 1)}</strong>
             </div>
             <div>
-              <span>P/L</span>
-              <strong className={tone(exposure.profit)}>
-                {formatMoney(exposure.profit)} ({formatPercent(exposure.profitPercent)})
-              </strong>
+              <span>Investment portfolio</span>
+              <strong>{formatPercent(exposure.investmentAllocationPercent, 1)}</strong>
             </div>
           </div>
+          {holding ? (
+            <div className="exposurePositionLine">
+              <span>{holding.shares.toLocaleString("en-US", { maximumFractionDigits: 8 })} units</span>
+              <span>Invested {formatMoney(holding.invested)}</span>
+              <strong className={tone(holding.profit)}>P/L {formatMoney(holding.profit)} ({formatPercent(holding.profitPercent)})</strong>
+            </div>
+          ) : null}
+          {exposure.etfOverlaps.length ? (
+            <details className="exposureOverlap">
+              <summary>Estimated ETF overlap</summary>
+              {exposure.etfOverlaps.map((item) => <p key={item.ticker}><strong>{item.ticker}</strong> · {item.weightPercent.toFixed(1)}% fund weight · {formatMoney(item.value)} effective value</p>)}
+            </details>
+          ) : null}
           <p className="exposureNote">
-            Adding to this asset would increase your {exposure.symbol} concentration above{" "}
-            {formatPercent(exposure.allocationPercent, 1)} of the portfolio.
+            Adding this asset would raise your current effective concentration above {formatPercent(exposure.investmentAllocationPercent, 1)} of invested assets.
           </p>
         </>
       ) : (
-        <p className="exposureSummary">
-          You do not currently hold <strong>{symbol}</strong> in this portfolio.
-        </p>
+        <><p className="exposureSummary">You do not currently have direct or identified ETF exposure to <strong>{symbol}</strong>.</p><p className="exposureNote">A new position would introduce fresh company-specific exposure to the investment portfolio.</p></>
       )}
+      <div className="researchActions">
+        <a href={`/?tab=assistant&currency=${encodeURIComponent(currency)}&prompt=${encodeURIComponent(scenarioPrompt)}`}>Simulate adding this asset</a>
+        <a href={`/?tab=assistant&currency=${encodeURIComponent(currency)}&prompt=${encodeURIComponent(`Analyze my existing ${symbol} exposure and the main portfolio risks.`)}`}>Ask Portfolio Assistant</a>
+      </div>
     </section>
   );
 }
 
 export function ResearchView({
+  currency,
   exposure,
   history,
   news,
@@ -738,7 +775,8 @@ export function ResearchView({
   symbol,
   timeframe,
 }: {
-  exposure: PortfolioExposure | null;
+  currency: string;
+  exposure: PortfolioExposure;
   history: PricePoint[];
   news: ResearchNewsItem[];
   profile: ResearchProfile | null;
@@ -783,7 +821,7 @@ export function ResearchView({
             />
           </section>
 
-          <PortfolioExposurePanel exposure={exposure} symbol={symbol} />
+          <PortfolioExposurePanel currency={currency} exposure={exposure} symbol={symbol} />
 
           <section>
             <div className="sectionHeader">
@@ -797,7 +835,7 @@ export function ResearchView({
                 {TIMEFRAMES.map((item) => (
                   <a
                     className={item.value === timeframe ? "active" : ""}
-                    href={`/?tab=research&symbol=${encodeURIComponent(symbol)}&range=${item.value}`}
+                    href={`/?tab=research&symbol=${encodeURIComponent(symbol)}&range=${item.value}&currency=${encodeURIComponent(currency)}`}
                     key={item.value}
                   >
                     {item.label}

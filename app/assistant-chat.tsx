@@ -7,6 +7,14 @@ import remarkGfm from "remark-gfm";
 type ChatMessage = {
   role: "assistant" | "user";
   text: string;
+  scenario?: ScenarioSummary;
+};
+
+type ScenarioSummary = {
+  allocation: Array<{ category: string; currentPercent: number; currentValue: number; proposedPercent: number; proposedValue: number }>;
+  currency: string;
+  metrics: Array<{ after: number; before: number; format: "currency" | "percent"; label: string }>;
+  note: string;
 };
 
 type SavedChat = {
@@ -70,11 +78,43 @@ function formatPercent(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
 }
 
-export function AssistantChat() {
+function scenarioValue(value: number, format: "currency" | "percent", currency: string) {
+  if (format === "percent") return `${value.toFixed(1)}%`;
+  return new Intl.NumberFormat("en-US", { currency, maximumFractionDigits: 0, style: "currency" }).format(value);
+}
+
+function ScenarioResult({ scenario }: { scenario: ScenarioSummary }) {
+  return (
+    <div className="scenarioSummary">
+      <strong className="scenarioLabel">Before vs after scenario</strong>
+      <div className="scenarioMetrics">
+        {scenario.metrics.map((metric) => {
+          const changed = Math.abs(metric.after - metric.before) >= (metric.format === "percent" ? 0.1 : 1);
+          return <div className={changed ? "changed" : ""} key={metric.label}><span>{metric.label}</span><strong>{scenarioValue(metric.before, metric.format, scenario.currency)} <i>→</i> {scenarioValue(metric.after, metric.format, scenario.currency)}</strong></div>;
+        })}
+      </div>
+      <div className="assistantTableScroll">
+        <table>
+          <thead><tr><th>Asset class</th><th>Current value</th><th>Current %</th><th>Proposed value</th><th>Proposed %</th></tr></thead>
+          <tbody>{scenario.allocation.map((row) => <tr key={row.category}><td>{row.category}</td><td>{scenarioValue(row.currentValue, "currency", scenario.currency)}</td><td>{scenarioValue(row.currentPercent, "percent", scenario.currency)}</td><td>{scenarioValue(row.proposedValue, "currency", scenario.currency)}</td><td>{scenarioValue(row.proposedPercent, "percent", scenario.currency)}</td></tr>)}</tbody>
+        </table>
+      </div>
+      <p>{scenario.note}</p>
+    </div>
+  );
+}
+
+const LINKABLE_TICKERS = new Set(["AAPL", "AAL", "AMZN", "BMW.DE", "BTC-USD", "ETH-USD", "GOOG", "GOOGL", "META", "MSFT", "NVDA", "SOL-USD", "TSLA"]);
+
+function researchSymbols(text: string) {
+  return Array.from(new Set((text.match(/\b[A-Z]{2,5}(?:\.[A-Z]{1,3}|-USD)?\b/g) ?? []).filter((item) => LINKABLE_TICKERS.has(item)))).slice(0, 4);
+}
+
+export function AssistantChat({ currency, initialPrompt = "" }: { currency: string; initialPrompt?: string }) {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [chats, setChats] = useState<SavedChat[]>([]);
   const [clientId, setClientId] = useState("");
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialPrompt);
   const [messages, setMessages] = useState<ChatMessage[]>(EMPTY_MESSAGES);
   const [historyStatus, setHistoryStatus] = useState("Loading saved chats...");
   const [isSending, setIsSending] = useState(false);
@@ -83,6 +123,7 @@ export function AssistantChat() {
   const [editingTitle, setEditingTitle] = useState("");
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [usageStatus, setUsageStatus] = useState("Loading usage...");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const combinedUsage = usage ? percentage(
     usage.quotas.reduce((sum, quota) => sum + quota.requests, 0),
     usage.quotas.reduce((sum, quota) => sum + quota.rpd, 0),
@@ -100,6 +141,10 @@ export function AssistantChat() {
   useEffect(() => {
     setClientId(getClientId());
   }, []);
+
+  useEffect(() => {
+    if (initialPrompt) setInput(initialPrompt);
+  }, [initialPrompt]);
 
   async function refreshUsage() {
     try {
@@ -201,6 +246,7 @@ export function AssistantChat() {
     try {
       const response = await fetch("/api/assistant", {
         body: JSON.stringify({
+          currency,
           messages: nextMessages.slice(-8),
         }),
         headers: {
@@ -214,7 +260,7 @@ export function AssistantChat() {
         throw new Error(data.error ?? "The assistant could not answer right now.");
       }
 
-      const answeredMessages = [...nextMessages, { role: "assistant" as const, text: data.answer }];
+      const answeredMessages = [...nextMessages, { role: "assistant" as const, scenario: data.scenario ?? undefined, text: data.answer }];
       setMessages(answeredMessages);
       void refreshUsage();
       try {
@@ -306,13 +352,16 @@ export function AssistantChat() {
     <section className="assistantPanel">
       <div className="assistantIntro">
         <div>
-          <h2>Gemini Assistant</h2>
+          <h2>Portfolio Assistant</h2>
           <p className="sectionNote">
-            Private helper for questions about your dashboard data. It can read the portfolio snapshot
-            sent by the server, but it cannot trade or edit files.
+            The assistant receives a structured snapshot of your portfolio and relevant research data when you ask a question. It cannot place trades or modify portfolio records.
           </p>
+          <details className="assistantPrivacy">
+            <summary>What data is shared?</summary>
+            <p>Portfolio holdings, current values, allocation, relevant research context, and recent saved conversation context when applicable. Login details and API keys are not included.</p>
+          </details>
         </div>
-        <span className="statusPill">Gemini</span>
+        <div className="assistantContextBadges"><span className="statusPill">Analysis currency: {currency}</span><span className="statusPill">Powered by Gemini</span></div>
       </div>
 
       <div className="assistantUsageCompact" title={combinedUsage === null ? usageStatus : "Combined daily request allowance used by this dashboard. Resets at midnight Pacific. Individual model limits still apply."}>
@@ -322,7 +371,8 @@ export function AssistantChat() {
       </div>
 
       <div className="assistantWorkspace">
-        <aside className="assistantSidebar" aria-label="Saved chats">
+        <button className="assistantSidebarToggle" onClick={() => setSidebarOpen((open) => !open)} type="button">{sidebarOpen ? "Hide saved chats" : "Show saved chats"}</button>
+        <aside className={`assistantSidebar ${sidebarOpen ? "open" : ""}`} aria-label="Saved chats">
           <div className="assistantSidebarHeader">
             <div>
               <strong>Saved chats</strong>
@@ -386,15 +436,16 @@ export function AssistantChat() {
 
           <div className="assistantMessages" aria-live="polite">
             {messages.map((message, index) => (
-              <div className={`assistantMessage ${message.role}`} key={`${message.role}-${index}`}>
+              <div className={`assistantMessage ${message.role} ${message.role === "assistant" && /\b(simulate|scenario|what if|investing)\b/i.test(messages[index - 1]?.text ?? "") ? "scenarioResult" : ""}`} key={`${message.role}-${index}`}>
                 <span>{message.role === "user" ? "You" : "Assistant"}</span>
                 {message.role === "assistant" ? (
-                  <div className="assistantMarkdown">
+                  <>{message.scenario ? <ScenarioResult scenario={message.scenario} /> : null}<div className="assistantMarkdown">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{
                       a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
                       table: ({ children }) => <div className="assistantTableScroll"><table>{children}</table></div>,
                     }}>{message.text}</ReactMarkdown>
                   </div>
+                  {researchSymbols(message.text).length ? <div className="assistantResearchLinks">{researchSymbols(message.text).map((ticker) => <a href={`/?tab=research&symbol=${encodeURIComponent(ticker)}&currency=${encodeURIComponent(currency)}`} key={ticker}>Open {ticker} in Research</a>)}</div> : null}</>
                 ) : <p>{message.text}</p>}
               </div>
             ))}

@@ -65,6 +65,19 @@ export type ResearchProfile = {
 };
 
 export type ResearchFundamentals = {
+  metrics?: {
+    beta?: string;
+    epsGrowth?: string;
+    fiftyTwoWeekHigh?: string;
+    fiftyTwoWeekLow?: string;
+    forwardPE?: string;
+    marketCap?: string;
+    profitMargin?: string;
+    revenueGrowth?: string;
+    source: string;
+    sourceUrl: string;
+    trailingPE?: string;
+  };
   dividend?: {
     annualDividend?: string;
     exDividendDate?: string;
