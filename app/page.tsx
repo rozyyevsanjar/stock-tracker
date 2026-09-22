@@ -347,7 +347,7 @@ function TabBar({ activeTab }: { activeTab: Tab }) {
     { label: "Home", value: "home", href: "/" },
     { label: "Transaction history", value: "transactions", href: "/?tab=transactions" },
     { label: "Research", value: "research", href: "/?tab=research" },
-    { label: "Assistant", value: "assistant", href: "/?tab=assistant" },
+    { label: "AI Assistant", value: "assistant", href: "/?tab=assistant" },
     { label: "Learn", value: "learn", href: "/?tab=learn" },
   ];
 
