@@ -1176,6 +1176,10 @@ function savingsHoldings(aedDisplayRate: number): Holding[] {
   });
 }
 
+function isSavingsHolding(holding: Holding) {
+  return holding.ticker.startsWith("SAVINGS-");
+}
+
 function withAllocation(holdings: Holding[]) {
   const totalValue = holdings.reduce((total, holding) => total + holding.currentValue, 0);
   return holdings
@@ -1471,10 +1475,14 @@ export default async function Home({
   const displayLots = convertLots(portfolioLotsForHome, usdDisplayRate);
   const performance = convertPerformance(buildPerformance(history, lots), usdDisplayRate);
 
-  const totalInvested = holdings.reduce((total, holding) => total + holding.invested, 0);
-  const totalValue = holdings.reduce((total, holding) => total + holding.currentValue, 0);
-  const previousValue = holdings.reduce((total, holding) => total + holding.previousValue, 0);
-  const totalProfit = holdings.reduce((total, holding) => total + holding.profit, 0);
+  const investmentHoldings = holdings.filter((holding) => !isSavingsHolding(holding));
+  const savingsBalance = holdings
+    .filter(isSavingsHolding)
+    .reduce((total, holding) => total + holding.currentValue, 0);
+  const totalInvested = investmentHoldings.reduce((total, holding) => total + holding.invested, 0);
+  const totalValue = investmentHoldings.reduce((total, holding) => total + holding.currentValue, 0);
+  const previousValue = investmentHoldings.reduce((total, holding) => total + holding.previousValue, 0);
+  const totalProfit = investmentHoldings.reduce((total, holding) => total + holding.profit, 0);
   const totalReturn = totalInvested ? (totalProfit / totalInvested) * 100 : 0;
   const dailyChange = totalValue - previousValue;
   const dailyChangePercent = previousValue ? (dailyChange / previousValue) * 100 : 0;
@@ -1497,14 +1505,19 @@ export default async function Home({
         <MetricCard
           label="Total invested"
           value={formatCurrency(totalInvested, displayCurrency)}
-          help="The total amount you put into open stock and crypto positions. Cash is excluded."
+          help="The total cost of open stocks, crypto, and metals. Savings accounts are shown separately."
         />
         <MetricCard
-          label="Portfolio value"
+          label="Investment value"
           value={formatCurrency(totalValue, displayCurrency)}
           delta={`${signed(dailyChange, (value) => formatCurrency(value, displayCurrency))} today`}
           deltaValue={dailyChange}
-          help="The current value of all holdings, including uninvested cash."
+          help="The current value of stocks, crypto, and metals. Savings accounts are excluded."
+        />
+        <MetricCard
+          label="Savings balance"
+          value={formatCurrency(savingsBalance, displayCurrency)}
+          help="The combined balance of your savings accounts, converted into the selected display currency."
         />
         <MetricCard
           label="Profit / loss"
@@ -1526,7 +1539,7 @@ export default async function Home({
 
       <DailyPortfolioSummary
         currency={displayCurrency}
-        holdings={holdings.map(({ ticker, company, currentValue, dailyChange, dailyChangePercent }) => ({
+        holdings={investmentHoldings.map(({ ticker, company, currentValue, dailyChange, dailyChangePercent }) => ({
           ticker,
           company,
           currentValue,
