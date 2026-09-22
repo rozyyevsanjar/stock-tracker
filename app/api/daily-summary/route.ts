@@ -41,6 +41,12 @@ function dubaiDay() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
 }
 
+function precisePercent(value: number) {
+  const absolute = Math.abs(value);
+  const digits = absolute === 0 || absolute >= 0.01 ? 2 : absolute >= 0.001 ? 3 : 4;
+  return value.toFixed(digits);
+}
+
 function usageMetadata(data: Record<string, unknown>) {
   const usage = data.usageMetadata as Record<string, unknown> | undefined;
   const inputTokens = Number(usage?.promptTokenCount ?? 0);
@@ -93,10 +99,11 @@ export async function POST(request: Request) {
   const totalValue = holdings.reduce((sum, holding) => sum + holding.currentValue, 0);
   const totalChange = holdings.reduce((sum, holding) => sum + holding.dailyChange, 0);
   const previousValue = totalValue - totalChange;
+  const portfolioChangePercent = previousValue ? totalChange / previousValue * 100 : 0;
   const prompt = [
     `Display currency: ${currency}`,
     `Portfolio value: ${totalValue.toFixed(2)}`,
-    `Today's estimated change: ${totalChange.toFixed(2)} (${(previousValue ? totalChange / previousValue * 100 : 0).toFixed(2)}%)`,
+    `Today's estimated change: ${totalChange.toFixed(2)} (${precisePercent(portfolioChangePercent)}%)`,
     "Holdings (daily change is the position-level contribution, not unit-price change):",
     ...holdings.sort((a, b) => Math.abs(b.dailyChange) - Math.abs(a.dailyChange)).map((item) =>
       `${item.ticker} (${item.company}): value ${item.currentValue.toFixed(2)}, contribution ${item.dailyChange.toFixed(2)}, asset move ${item.dailyChangePercent.toFixed(2)}%`,

@@ -46,6 +46,12 @@ import type { ReactNode } from "react";
 export const revalidate = 900;
 
 type Tab = "home" | "tracker" | "transactions" | "research" | "assistant" | "learn";
+
+function formatDailyPercent(value: number) {
+  const absolute = Math.abs(value);
+  const digits = absolute === 0 || absolute >= 0.01 ? 2 : absolute >= 0.001 ? 3 : 4;
+  return formatPercent(value, digits);
+}
 type LotStatusFilter = "all" | "open" | "closed";
 type LotResultFilter = "all" | "profitable" | "loss" | "flat";
 type LotSort = "newest" | "oldest" | "profit" | "loss" | "value";
@@ -1512,7 +1518,7 @@ export default async function Home({
           label="Total return"
           value={formatPercent(totalReturn)}
           valueTone={tone(totalReturn)}
-          delta={`${signed(dailyChangePercent, (value) => formatPercent(value))} today`}
+          delta={`${signed(dailyChangePercent, formatDailyPercent)} today`}
           deltaValue={dailyChangePercent}
           help="Unrealized profit or loss divided by total invested capital."
         />
